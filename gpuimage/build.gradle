@@ -1,28 +1,38 @@
 plugins {
-    alias(libs.plugins.android.application)
+    id 'com.android.library'
 }
 
 android {
 
-    namespace 'com.dreamjourney.customlib'
+    namespace 'com.dreamjourney.gpuimage'
     compileSdk 35
 
     defaultConfig {
 
-        applicationId "com.dreamjourney.customlib"
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles "consumer-rules.pro"
+        externalNativeBuild {
+            cmake {
+                cppFlags ""
+            }
+        }
 
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
-                    'proguard-rules.pro'
+            debuggable false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            /*version "3.4.1"*/
         }
     }
 
@@ -37,10 +47,8 @@ dependencies {
 
     implementation libs.appcompat
     implementation libs.material
-    implementation libs.activity
-    implementation libs.constraintlayout
+    implementation libs.exifinterface
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
-
 }

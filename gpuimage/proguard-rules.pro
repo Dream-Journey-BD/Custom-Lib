@@ -1,0 +1,1 @@
+# GPU Image Pro Guard Rules Here
