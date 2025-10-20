@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_gravity="center">
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/carView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:cardElevation="0dp">
+
+        <RelativeLayout
+            android:id="@+id/mainRL"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:padding="15dp">
+
+            <com.dreamjourney.utilsx.colorpicker.SquareView
+                android:id="@+id/squareView"
+                android:layout_width="@dimen/hsvWidth"
+                android:layout_height="@dimen/hsvHeight"
+                android:layerType="software" />
+
+            <FrameLayout
+                android:id="@+id/alphaFrame"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignStart="@+id/squareView"
+                android:layout_alignTop="@+id/previewFrame"
+                android:layout_alignBottom="@+id/previewFrame"
+                android:layout_gravity="start"
+                android:layout_toStartOf="@+id/previewFrame">
+
+                <ImageView
+                    android:id="@+id/alphaView"
+                    android:layout_width="match_parent"
+                    android:layout_height="12dp"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="@string/alpha_view"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/checker_png" />
+
+                <View
+                    android:id="@+id/alphaOverlay"
+                    android:layout_width="match_parent"
+                    android:layout_height="12dp"
+                    android:layout_gravity="center_vertical" />
+
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/previewFrame"
+                android:layout_width="50dp"
+                android:layout_height="25dp"
+                android:layout_below="@id/squareView"
+                android:layout_alignEnd="@+id/colorView"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginStart="@dimen/spacer"
+                android:layout_marginTop="@dimen/spacer">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/checker_png" />
+
+                <View
+                    android:id="@+id/newColor"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#aaf" />
+
+            </FrameLayout>
+
+            <!--All Cursor Here-->
+            <ImageView
+                android:id="@+id/colorView"
+                android:layout_width="@dimen/hueWidth"
+                android:layout_height="@dimen/hsvHeight"
+                android:layout_marginStart="@dimen/spacer"
+                android:layout_toEndOf="@id/squareView"
+                android:contentDescription="@string/color_view"
+                android:scaleType="fitXY"
+                android:src="@drawable/color_line" />
+
+            <ImageView
+                android:id="@+id/squareColorSelector"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/selector"
+                android:src="@drawable/square_cursor" />
+
+            <ImageView
+                android:id="@+id/colorSelector"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/selector"
+                android:src="@drawable/color_selector" />
+
+            <ImageView
+                android:id="@+id/alphaSelector"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignTop="@+id/alphaFrame"
+                android:layout_alignBottom="@+id/alphaFrame"
+                android:contentDescription="@string/selector"
+                android:src="@drawable/alpha_cursor" />
+
+            <LinearLayout
+                android:id="@+id/buttonLay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/alphaFrame"
+                android:layout_alignStart="@+id/squareView"
+                android:layout_alignEnd="@+id/colorView"
+                android:layout_marginTop="@dimen/spacer"
+                android:layout_marginEnd="@dimen/hueWidth"
+                android:gravity="end"
+                android:orientation="horizontal"
+                android:paddingTop="@dimen/spacer"
+                android:paddingBottom="@dimen/spacer"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/cancel_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="30dp"
+                    android:text="@string/cancel"
+                    android:textColor="#009688"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/okButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/ok"
+                    android:textColor="#009688"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+        </RelativeLayout>
+
+    </androidx.cardview.widget.CardView>
+
+</FrameLayout>

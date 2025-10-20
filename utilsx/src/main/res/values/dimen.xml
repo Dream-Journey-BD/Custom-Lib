@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+	<dimen name="hsvHeight">220dp</dimen>
+	<dimen name="hsvWidth">220dp</dimen>
+	<dimen name="hueWidth">20dp</dimen>
+	<dimen name="spacer">8dp</dimen>
+
+</resources>

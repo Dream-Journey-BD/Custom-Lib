@@ -9,6 +9,8 @@ material = "1.13.0"
 activity = "1.10.1"
 constraintlayout = "2.2.1"
 exifinterface = "1.4.1"
+sdpAndroid = "1.1.1"
+sspAndroid = "1.1.1"
 window = "1.5.0"
 
 [libraries]
@@ -20,6 +22,8 @@ material = { group = "com.google.android.material", name = "material", version.r
 activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
+sdp-android = { module = "com.intuit.sdp:sdp-android", version.ref = "sdpAndroid" }
+ssp-android = { module = "com.intuit.ssp:ssp-android", version.ref = "sspAndroid" }
 window = { module = "androidx.window:window", version.ref = "window" }
 
 [plugins]

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--Progress Dialog-->
+    <string name="please_wait">Please Wait…</string>
+
+    <!--Color Picker Dialog-->
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="alpha_view">Alpha View</string>
+    <string name="color_view">Color View</string>
+    <string name="selector">Selector</string>
+    <string name="chose_file">Chose File</string>
+
+</resources>

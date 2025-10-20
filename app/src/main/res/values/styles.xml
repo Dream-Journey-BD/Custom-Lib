@@ -10,4 +10,16 @@
         <item name="trackColor">#9E9E9E</item>
     </style>
 
+
+    <!-- Custom style for your custom setting toolbar layout -->
+    <style name="ToolbarStyle">
+        <item name="android:layout_height">50dp</item>
+        <item name="android:background">?attr/colorPrimary</item>
+        <item name="android:paddingEnd">2dp</item>
+        <item name="titleTextColor">@color/white</item>
+        <item name="titleTextSize">20sp</item>
+        <item name="titleFontStyle">bold</item>
+
+    </style>
+
 </resources>
