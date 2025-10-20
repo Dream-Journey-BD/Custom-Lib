@@ -217,27 +217,27 @@ public class GPUImageRenderer implements GLSurfaceView.Renderer, GLTextureView.R
     }
 
     private void adjustImageScaling() {
-        float outputWidth = this.outputWidth;
-        float outputHeight = this.outputHeight;
-        if (rotation == Rotation.ROTATION_270 || rotation == Rotation.ROTATION_90) {
-            outputWidth = this.outputHeight;
-            outputHeight = this.outputWidth;
-        }
+        final boolean rotated = rotation == Rotation.ROTATION_270 || rotation == Rotation.ROTATION_90;
 
-        float ratio1 = outputWidth / imageWidth;
-        float ratio2 = outputHeight / imageHeight;
-        float ratioMax = Math.max(ratio1, ratio2);
-        int imageWidthNew = Math.round(imageWidth * ratioMax);
-        int imageHeightNew = Math.round(imageHeight * ratioMax);
+        final float outWidth = rotated ? this.outputHeight : this.outputWidth;
+        final float outHeight = rotated ? this.outputWidth : this.outputHeight;
 
-        float ratioWidth = imageWidthNew / outputWidth;
-        float ratioHeight = imageHeightNew / outputHeight;
+        final float ratio1 = outWidth / imageWidth;
+        final float ratio2 = outHeight / imageHeight;
+        final float ratioMax = Math.max(ratio1, ratio2);
+
+        final int imageWidthNew = Math.round(imageWidth * ratioMax);
+        final int imageHeightNew = Math.round(imageHeight * ratioMax);
+
+        final float ratioWidth = imageWidthNew / outWidth;
+        final float ratioHeight = imageHeightNew / outHeight;
 
         float[] cube = CUBE;
         float[] textureCords = TextureRotationUtil.getRotation(rotation, flipHorizontal, flipVertical);
+
         if (scaleType == GPUImage.ScaleType.CENTER_CROP) {
-            float distHorizontal = (1 - 1 / ratioWidth) / 2;
-            float distVertical = (1 - 1 / ratioHeight) / 2;
+            float distHorizontal = (1 - 1 / ratioWidth) / 2f;
+            float distVertical = (1 - 1 / ratioHeight) / 2f;
             textureCords = new float[]{
                     addDistance(textureCords[0], distHorizontal), addDistance(textureCords[1], distVertical),
                     addDistance(textureCords[2], distHorizontal), addDistance(textureCords[3], distVertical),

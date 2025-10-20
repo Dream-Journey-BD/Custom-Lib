@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Common style for all Sliders -->
+    <style name="AppSliderStyle" parent="Widget.MaterialComponents.Slider">
+        <item name="thumbHeight">10dp</item>
+        <item name="thumbWidth">4dp</item>
+        <item name="thumbTrackGapSize">0dp</item>
+        <item name="trackCornerSize">2dp</item>
+        <item name="trackHeight">5dp</item>
+        <item name="trackColor">#9E9E9E</item>
+    </style>
+
+</resources>

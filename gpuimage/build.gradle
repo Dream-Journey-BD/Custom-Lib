@@ -41,6 +41,11 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
 
+    // For Detect Warning
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs << "-Xlint:deprecation"
+    }
+
 }
 
 dependencies {
@@ -51,4 +56,5 @@ dependencies {
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
+    implementation libs.window
 }

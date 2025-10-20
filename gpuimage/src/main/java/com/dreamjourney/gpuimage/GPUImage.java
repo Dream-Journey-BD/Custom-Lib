@@ -5,23 +5,22 @@ import android.content.Context;
 import android.content.pm.ConfigurationInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
-import android.graphics.Bitmap.CompressFormat;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.opengl.GLSurfaceView;
-import android.os.AsyncTask;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.Looper;
 import android.provider.MediaStore;
-import android.view.Display;
-import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.exifinterface.media.ExifInterface;
+import androidx.window.layout.WindowMetricsCalculator;
 
 import com.dreamjourney.gpuimage.filter.GPUImageFilter;
 import com.dreamjourney.gpuimage.util.Rotation;
@@ -33,6 +32,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class GPUImage {
 
@@ -289,16 +290,20 @@ public class GPUImage {
     public Bitmap getBitmapWithFilterApplied(final Bitmap bitmap, boolean recycle) {
         if (glSurfaceView != null || glTextureView != null) {
             renderer.deleteImage();
+
+            final GPUImageFilter syncFilter = filter; // make local final copy
+
             renderer.runOnDraw(() -> {
-                synchronized (filter) {
-                    filter.destroy();
-                    filter.notify();
+                synchronized (syncFilter) {
+                    syncFilter.destroy();
+                    syncFilter.notify();
                 }
             });
-            synchronized (filter) {
+
+            synchronized (syncFilter) {
                 requestRender();
                 try {
-                    filter.wait();
+                    syncFilter.wait();
                 } catch (InterruptedException e) {
                     //e.printStackTrace();
                 }
@@ -309,10 +314,12 @@ public class GPUImage {
         renderer.setRotation(Rotation.NORMAL,
                 this.renderer.isFlippedHorizontally(), this.renderer.isFlippedVertically());
         renderer.setScaleType(scaleType);
+
         PixelBuffer buffer = new PixelBuffer(bitmap.getWidth(), bitmap.getHeight());
         buffer.setRenderer(renderer);
         renderer.setImageBitmap(bitmap, recycle);
         Bitmap result = buffer.getBitmap();
+
         filter.destroy();
         renderer.deleteImage();
         buffer.destroy();
@@ -407,9 +414,9 @@ public class GPUImage {
         } else if (currentBitmap != null) {
             return currentBitmap.getWidth();
         } else {
-            WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-            Display display = windowManager.getDefaultDisplay();
-            return display.getWidth();
+            WindowMetricsCalculator wmCalculator = WindowMetricsCalculator.getOrCreate();
+            Rect bounds = wmCalculator.computeCurrentWindowMetrics(context).getBounds();
+            return bounds.width();
         }
     }
 
@@ -419,21 +426,19 @@ public class GPUImage {
         } else if (currentBitmap != null) {
             return currentBitmap.getHeight();
         } else {
-            WindowManager windowManager =
-                    (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-            Display display = windowManager.getDefaultDisplay();
-            return display.getHeight();
+            WindowMetricsCalculator wmCalculator = WindowMetricsCalculator.getOrCreate();
+            Rect bounds = wmCalculator.computeCurrentWindowMetrics(context).getBounds();
+            return bounds.height();
         }
     }
 
-    @Deprecated
-    private class SaveTask extends AsyncTask<Void, Void, Void> {
-
+    private class SaveTask {
         private final Bitmap bitmap;
         private final String folderName;
         private final String fileName;
         private final OnPictureSavedListener listener;
-        private final Handler handler;
+        private final Handler handler = new Handler(Looper.getMainLooper());
+        private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
         public SaveTask(final Bitmap bitmap, final String folderName, final String fileName,
                         final OnPictureSavedListener listener) {
@@ -441,34 +446,36 @@ public class GPUImage {
             this.folderName = folderName;
             this.fileName = fileName;
             this.listener = listener;
-            handler = new Handler();
         }
 
-        @Nullable
-        @Override
-        protected Void doInBackground(final Void... params) {
-            Bitmap result = getBitmapWithFilterApplied(bitmap);
-            saveImage(folderName, fileName, result);
-            return null;
+        public void execute() {
+            executor.execute(() -> {
+                Bitmap result = getBitmapWithFilterApplied(bitmap);
+                saveImage(folderName, fileName, result);
+            });
         }
 
-        private void saveImage(
-                final String folderName, final String fileName, @NonNull final Bitmap image
-        ) {
+        private void saveImage(String folderName, String fileName, @NonNull Bitmap image) {
             File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
             File file = new File(path, folderName + "/" + fileName);
             try {
-                file.getParentFile().mkdirs();
-                image.compress(CompressFormat.JPEG, 80, new FileOutputStream(file));
-                MediaScannerConnection.scanFile(context,
-                        new String[]{
-                                file.toString()
-                        }, null,
-                        (path1, uri) -> {
-                            if (listener != null) handler.post(() -> listener.onPictureSaved(uri));
-                        });
+
+                if (file.getParentFile() != null) {
+                    //noinspection ResultOfMethodCallIgnored
+                    file.getParentFile().mkdirs();
+                }
+
+                image.compress(Bitmap.CompressFormat.JPEG, 80, new FileOutputStream(file));
+                MediaScannerConnection.scanFile(context, new String[]{file.toString()},
+                        null, (path1, uri) -> {
+                            if (listener != null) handler.post(() ->
+                                    listener.onPictureSaved(uri)
+                            );
+                        }
+                );
+
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                //e.printStackTrace();
             }
         }
     }
@@ -564,40 +571,36 @@ public class GPUImage {
         }
     }
 
-    private abstract class LoadImageTask extends AsyncTask<Void, Void, Bitmap> {
-
+    private abstract class LoadImageTask {
         private final GPUImage gpuImage;
         private int outputWidth;
         private int outputHeight;
+        private final ExecutorService executor = Executors.newSingleThreadExecutor();
+        private final Handler handler = new Handler(Looper.getMainLooper());
 
-        /**
-         * @noinspection deprecation
-         */
         public LoadImageTask(final GPUImage gpuImage) {
             this.gpuImage = gpuImage;
         }
 
-        @Override
-        protected Bitmap doInBackground(Void... params) {
-            if (renderer != null && renderer.getFrameWidth() == 0) {
-                try {
-                    synchronized (renderer.surfaceChangedWaiter) {
-                        renderer.surfaceChangedWaiter.wait(3000);
+        public void execute() {
+            executor.execute(() -> {
+                if (renderer != null && renderer.getFrameWidth() == 0) {
+                    try {
+                        synchronized (renderer.surfaceChangedWaiter) {
+                            renderer.surfaceChangedWaiter.wait(3000);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                     }
-                } catch (InterruptedException e) {
-                    //e.printStackTrace();
                 }
-            }
-            outputWidth = getOutputWidth();
-            outputHeight = getOutputHeight();
-            return loadResizedImage();
-        }
-
-        @Override
-        protected void onPostExecute(Bitmap bitmap) {
-            super.onPostExecute(bitmap);
-            gpuImage.deleteImage();
-            gpuImage.setImage(bitmap);
+                outputWidth = getOutputWidth();
+                outputHeight = getOutputHeight();
+                Bitmap bitmap = loadResizedImage();
+                handler.post(() -> {
+                    gpuImage.deleteImage();
+                    gpuImage.setImage(bitmap);
+                });
+            });
         }
 
         protected abstract Bitmap decode(BitmapFactory.Options options);

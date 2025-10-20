@@ -10,7 +10,6 @@ import android.graphics.Color;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.opengl.GLSurfaceView;
-import android.os.AsyncTask;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
@@ -21,14 +20,14 @@ import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 
-import androidx.annotation.Nullable;
-
 import com.dreamjourney.gpuimage.filter.GPUImageFilter;
 import com.dreamjourney.gpuimage.util.Rotation;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 
 public class GPUImageView extends FrameLayout {
@@ -55,16 +54,16 @@ public class GPUImageView extends FrameLayout {
     }
 
     private void init(Context context, AttributeSet attrs) {
-        if (attrs != null) {
-            TypedArray a = context.getTheme().obtainStyledAttributes(attrs, R.styleable.GPUImageView, 0, 0);
-            try {
-                surfaceType = a.getInt(R.styleable.GPUImageView_gpuimage_surface_type, surfaceType);
-                isShowLoading = a.getBoolean(R.styleable.GPUImageView_gpuimage_show_loading, isShowLoading);
-            } finally {
-                a.recycle();
-            }
+
+        try (TypedArray a = getContext().getTheme().obtainStyledAttributes(
+                attrs, R.styleable.GPUImageView, 0, 0)
+        ) {
+            surfaceType = a.getInt(R.styleable.GPUImageView_gpuimage_surface_type, surfaceType);
+            isShowLoading = a.getBoolean(R.styleable.GPUImageView_gpuimage_show_loading, isShowLoading);
         }
+
         gpuImage = new GPUImage(context);
+
         if (surfaceType == SURFACE_TYPE_TEXTURE_VIEW) {
             surfaceView = new GPUImageGLTextureView(context, attrs);
             gpuImage.setGLTextureView((GLTextureView) surfaceView);
@@ -72,6 +71,7 @@ public class GPUImageView extends FrameLayout {
             surfaceView = new GPUImageGLSurfaceView(context, attrs);
             gpuImage.setGLSurfaceView((GLSurfaceView) surfaceView);
         }
+
         addView(surfaceView);
     }
 
@@ -151,7 +151,7 @@ public class GPUImageView extends FrameLayout {
         }
     }
 
-    // TODO Should be an xml attribute. But then GPUImage can not be distributed as .jar anymore.
+    // Should be an xml attribute. But then GPUImage can not be distributed as .jar anymore.
     public void setRatio(float ratio) {
         this.ratio = ratio;
         surfaceView.requestLayout();
@@ -243,9 +243,11 @@ public class GPUImageView extends FrameLayout {
      * @param fileName   the file name
      * @param listener   the listener
      */
-    public void saveToPictures(final String folderName, final String fileName,
-                               final OnPictureSavedListener listener) {
-        new SaveTask(folderName, fileName, listener).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    public void saveToPictures(
+            final String folderName, final String fileName,
+            final OnPictureSavedListener listener
+    ) {
+        new SaveTask(folderName, fileName, listener).execute();
     }
 
     /**
@@ -266,9 +268,7 @@ public class GPUImageView extends FrameLayout {
             int width, int height,
             final OnPictureSavedListener listener
     ) {
-        new SaveTask(
-                folderName, fileName, width, height, listener
-        ).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        new SaveTask(folderName, fileName, width, height, listener).execute();
     }
 
     /**
@@ -449,42 +449,47 @@ public class GPUImageView extends FrameLayout {
         }
     }
 
-    private class SaveTask extends AsyncTask<Void, Void, Void> {
+    // ✅ Replace AsyncTask-based SaveTask with ExecutorService version (no deprecated APIs)
+    private class SaveTask {
         private final String folderName;
         private final String fileName;
         private final int width;
         private final int height;
         private final OnPictureSavedListener listener;
         private final Handler handler;
+        private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
         public SaveTask(final String folderName, final String fileName,
                         final OnPictureSavedListener listener) {
             this(folderName, fileName, 0, 0, listener);
         }
 
-        public SaveTask(final String folderName, final String fileName, int width, int height,
-                        final OnPictureSavedListener listener) {
+        public SaveTask(
+                final String folderName, final String fileName, int width, int height,
+                final OnPictureSavedListener listener
+        ) {
             this.folderName = folderName;
             this.fileName = fileName;
             this.width = width;
             this.height = height;
             this.listener = listener;
-            handler = new Handler(Looper.getMainLooper());
+            this.handler = new Handler(Looper.getMainLooper());
         }
 
-        @Nullable
-        @Override
-        protected Void doInBackground(final Void... params) {
-            try {
-                Bitmap result = width != 0 ? capture(width, height) : capture();
-                saveImage(folderName, fileName, result);
-            } catch (InterruptedException e) {
-                //e.printStackTrace();
-            }
-            return null;
+        public void execute() {
+            executor.execute(() -> {
+                try {
+                    Bitmap result = width != 0 ? capture(width, height) : capture();
+                    saveImage(folderName, fileName, result);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
         }
 
-        private void saveImage(final String folderName, final String fileName, final Bitmap image) {
+        private void saveImage(
+                final String folderName, final String fileName, final Bitmap image
+        ) {
             File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
             File file = new File(path, folderName + "/" + fileName);
             try {
@@ -495,14 +500,15 @@ public class GPUImageView extends FrameLayout {
 
                 image.compress(Bitmap.CompressFormat.JPEG, 80, new FileOutputStream(file));
                 MediaScannerConnection.scanFile(getContext(),
-                        new String[]{
-                                file.toString()
-                        }, null,
+                        new String[]{file.toString()},
+                        null,
                         (path1, uri) -> {
                             if (listener != null) {
                                 handler.post(() -> listener.onPictureSaved(uri));
                             }
-                        });
+                        }
+                );
+
             } catch (FileNotFoundException e) {
                 //e.printStackTrace();
             }

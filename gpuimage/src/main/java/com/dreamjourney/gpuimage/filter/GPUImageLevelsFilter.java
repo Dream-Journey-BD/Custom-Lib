@@ -7,8 +7,6 @@ import android.opengl.GLES20;
  */
 public class GPUImageLevelsFilter extends GPUImageFilter {
 
-    private static final String LOGTAG = GPUImageLevelsFilter.class.getSimpleName();
-
     public static final String LEVELS_FRAGMET_SHADER =
 
             " varying highp vec2 textureCoordinate;\n" +
