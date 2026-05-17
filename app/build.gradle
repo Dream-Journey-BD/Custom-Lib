@@ -44,8 +44,7 @@ dependencies {
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
-    // Gpu Image Add
-    //implementation project(':gpuimage')
+    // Custom Lib Here
     implementation project(':utilsx')
 
 }

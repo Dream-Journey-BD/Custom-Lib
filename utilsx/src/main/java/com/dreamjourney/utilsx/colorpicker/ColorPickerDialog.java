@@ -16,14 +16,11 @@ import com.dreamjourney.utilsx.R;
 
 public class ColorPickerDialog extends Dialog {
     private int btnTextColor = Color.MAGENTA;
-
-
     private boolean showButton = true;
     private final int color;
     private final boolean alpha;
     private final Config.ColorListener listener;
     private Config config;
-
 
     public ColorPickerDialog(
             @NonNull Context context, @ColorInt int initColor,
@@ -74,6 +71,5 @@ public class ColorPickerDialog extends Dialog {
     public void setShowButton(boolean showButton) {
         this.showButton = showButton;
     }
-
 
 }

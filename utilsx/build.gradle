@@ -9,15 +9,14 @@ android {
 
     defaultConfig {
         minSdk 26
-
+        targetSdk 35
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
     }
 
     buildTypes {
         release {
-            minifyEnabled true
-            debuggable false
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -41,8 +40,9 @@ dependencies {
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
-    implementation libs.ssp.android
-    implementation libs.sdp.android
-    implementation libs.exifinterface
+    // public Lib
+    implementation 'com.intuit.ssp:ssp-android:1.1.1'
+    implementation 'com.intuit.sdp:sdp-android:1.1.1'
+    implementation "androidx.exifinterface:exifinterface:1.4.1"
 
 }

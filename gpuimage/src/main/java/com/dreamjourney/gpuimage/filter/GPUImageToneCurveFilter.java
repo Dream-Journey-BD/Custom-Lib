@@ -229,7 +229,8 @@ public class GPUImageToneCurveFilter extends GPUImageFilter {
         );
         if (splinePoints != null) {
             for (Point newPoint : splinePoints) {
-                Point origPoint = new Point(newPoint.x, newPoint.x);
+                // Maybe its Bugs
+                Point origPoint = new Point(newPoint.x, newPoint.y);
 
                 float distance = (float) Math.sqrt(
                         Math.pow((origPoint.x - newPoint.x), 2.0) +

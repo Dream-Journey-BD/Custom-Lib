@@ -134,6 +134,16 @@ public class ImageColorPicker extends FrameLayout {
         if (imageDrawable != null) imageBitmap = imageDrawable.getBitmap();
     }
 
+    public Drawable getImage() {
+        return mainImageView.getDrawable();
+    }
+
+    public void removeImage() {
+        mainImageView.setImageDrawable(null);
+        imageDrawable = null;
+        imageBitmap = null;
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private void TouchControl() {
 

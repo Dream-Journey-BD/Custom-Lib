@@ -1,6 +1,8 @@
 package com.dreamjourney.gpuimage;
 
+import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.pm.ConfigurationInfo;
 import android.database.Cursor;
@@ -16,6 +18,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
+import android.view.Window;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -526,8 +529,11 @@ public class GPUImage {
 
         @Override
         protected int getImageOrientation() {
-            Cursor cursor = context.getContentResolver().query(uri,
-                    new String[]{MediaStore.Images.ImageColumns.ORIENTATION}, null, null, null);
+            Cursor cursor = context.getContentResolver().query(
+                    uri,
+                    new String[]{MediaStore.Images.ImageColumns.ORIENTATION},
+                    null, null, null
+            );
 
             if (cursor == null || cursor.getCount() != 1) {
                 return 0;
@@ -577,13 +583,24 @@ public class GPUImage {
         private int outputHeight;
         private final ExecutorService executor = Executors.newSingleThreadExecutor();
         private final Handler handler = new Handler(Looper.getMainLooper());
+        // Progress dialog
+        private final Dialog progressDialog;
 
         public LoadImageTask(final GPUImage gpuImage) {
             this.gpuImage = gpuImage;
+            this.progressDialog = loaddingDialog((Activity) context);
         }
 
         public void execute() {
             executor.execute(() -> {
+
+                // Loading Start
+                handler.post(() -> {
+                    if (progressDialog != null && !progressDialog.isShowing()) {
+                        progressDialog.show();
+                    }
+                });
+
                 if (renderer != null && renderer.getFrameWidth() == 0) {
                     try {
                         synchronized (renderer.surfaceChangedWaiter) {
@@ -599,6 +616,10 @@ public class GPUImage {
                 handler.post(() -> {
                     gpuImage.deleteImage();
                     gpuImage.setImage(bitmap);
+                    // Loading End
+                    if (progressDialog != null && progressDialog.isShowing()) {
+                        progressDialog.dismiss();
+                    }
                 });
             });
         }
@@ -729,6 +750,17 @@ public class GPUImage {
     // msg: get GPUImageRenderer for getting options
     public GPUImageRenderer getRenderer() {
         return renderer;
+    }
+
+    @NonNull
+    private Dialog loaddingDialog(Activity activity) {
+        Dialog dialog = new Dialog(activity);
+        dialog.setCancelable(false);
+        dialog.setContentView(R.layout.lodaing_dialog);
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) window.setBackgroundDrawableResource(R.drawable.empty_rect);
+        return dialog;
     }
 
 }

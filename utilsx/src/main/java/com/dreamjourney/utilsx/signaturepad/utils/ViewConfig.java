@@ -9,7 +9,6 @@ public class ViewConfig {
 
     public static boolean isLaidOut(@NonNull View view) {
         return view.isLaidOut();
-
     }
 
     public static void removeOnGlobalLayoutListener(

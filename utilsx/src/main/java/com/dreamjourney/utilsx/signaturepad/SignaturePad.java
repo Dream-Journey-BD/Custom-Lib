@@ -61,7 +61,6 @@ public class SignaturePad extends View {
     private final boolean mClearOnDoubleClick;
 
     //Double click detector
-
     private final Paint mPaint = new Paint();
     private Bitmap mSignatureBitmap = null;
     private Canvas mSignatureBitmapCanvas = null;
@@ -99,9 +98,7 @@ public class SignaturePad extends View {
 
         //Dirty rectangle to update only the changed portion of the view
         mDirtyRect = new RectF();
-
         clearView();
-
 
     }
 

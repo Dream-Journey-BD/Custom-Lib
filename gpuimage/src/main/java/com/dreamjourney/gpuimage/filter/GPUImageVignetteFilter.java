@@ -43,7 +43,7 @@ public class GPUImageVignetteFilter extends GPUImageFilter {
     private float vignetteEnd;
 
     public GPUImageVignetteFilter() {
-        this(new PointF(), new float[]{0.0f, 0.0f, 0.0f}, 0.3f, 0.75f);
+        this(new PointF(), new float[]{0.0f, 0.0f, 0.0f}, 0.5f, 0.75f);
     }
 
     public GPUImageVignetteFilter(
@@ -93,6 +93,14 @@ public class GPUImageVignetteFilter extends GPUImageFilter {
     public void setVignetteEnd(final float vignetteEnd) {
         this.vignetteEnd = vignetteEnd;
         setFloat(vignetteEndLocation, this.vignetteEnd);
+    }
+
+    public float getVignetteStart() {
+        return vignetteStart;
+    }
+
+    public float getVignetteEnd() {
+        return vignetteEnd;
     }
 
 }

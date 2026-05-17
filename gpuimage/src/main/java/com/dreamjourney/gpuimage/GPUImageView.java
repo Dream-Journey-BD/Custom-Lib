@@ -58,8 +58,8 @@ public class GPUImageView extends FrameLayout {
         try (TypedArray a = getContext().getTheme().obtainStyledAttributes(
                 attrs, R.styleable.GPUImageView, 0, 0)
         ) {
-            surfaceType = a.getInt(R.styleable.GPUImageView_gpuimage_surface_type, surfaceType);
-            isShowLoading = a.getBoolean(R.styleable.GPUImageView_gpuimage_show_loading, isShowLoading);
+            surfaceType = a.getInt(R.styleable.GPUImageView_gpuImage_surface_type, surfaceType);
+            isShowLoading = a.getBoolean(R.styleable.GPUImageView_gpuImage_show_loading, isShowLoading);
         }
 
         gpuImage = new GPUImage(context);
@@ -442,8 +442,10 @@ public class GPUImageView extends FrameLayout {
 
         private void init() {
             ProgressBar view = new ProgressBar(getContext());
-            view.setLayoutParams(
-                    new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+            view.setLayoutParams(new LayoutParams(
+                    LayoutParams.WRAP_CONTENT,
+                    LayoutParams.WRAP_CONTENT, Gravity.CENTER)
+            );
             addView(view);
             setBackgroundColor(Color.BLACK);
         }

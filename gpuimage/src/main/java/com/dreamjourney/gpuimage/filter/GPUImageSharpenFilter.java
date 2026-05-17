@@ -107,4 +107,8 @@ public class GPUImageSharpenFilter extends GPUImageFilter {
         setFloat(sharpnessLocation, this.sharpness);
     }
 
+    public float getSharpness() {
+        return sharpness;
+    }
+
 }

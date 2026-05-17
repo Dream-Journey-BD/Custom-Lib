@@ -10,22 +10,19 @@ import android.widget.RelativeLayout;
 import com.dreamjourney.utilsx.R;
 
 public class ColorPickerView extends RelativeLayout {
-
+    int initColor;
+    int buttonColor;
+    boolean enableAlpha;
+    boolean showButton;
     private final Config config;
 
     public ColorPickerView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
-        // Default Value Here
-        int initColor = Color.RED;
-        int buttonColor = Color.MAGENTA;
-        boolean enableAlpha = false;
-        boolean showButton = false;
-
         LayoutInflater.from(context).inflate(
-                R.layout.color_picker_dialog, this, true
+                R.layout.color_picker_dialog,
+                this, true
         );
-
 
         try (TypedArray ta = context.getTheme().obtainStyledAttributes(
                 attrs, R.styleable.ColorPickerAttr,
@@ -36,7 +33,6 @@ public class ColorPickerView extends RelativeLayout {
             enableAlpha = ta.getBoolean(R.styleable.ColorPickerAttr_enableAlpha, false);
             showButton = ta.getBoolean(R.styleable.ColorPickerAttr_showButton, false);
         }
-
 
         config = new Config(
                 this,
@@ -53,4 +49,5 @@ public class ColorPickerView extends RelativeLayout {
     public void setColorListener(Config.ColorListener listener) {
         config.listener = listener;
     }
+
 }

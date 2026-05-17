@@ -8,7 +8,6 @@ import android.view.animation.AnimationUtils;
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 
-
 import com.dreamjourney.utilsx.R;
 
 import java.util.Locale;
@@ -86,6 +85,16 @@ public class Const {
         argb[2] = Color.green(color);
         argb[3] = Color.blue(color);
         return argb;
+    }
+
+    public static int getContrastTextColor(int color) {
+        int red = Color.red(color);
+        int green = Color.green(color);
+        int blue = Color.blue(color);
+        // Luminance Calculation
+        double luminance = (0.299 * red + 0.587 * green + 0.114 * blue);
+        // if dark background → return white, else black
+        return luminance < 128 ? Color.WHITE : Color.BLACK;
     }
 
 }

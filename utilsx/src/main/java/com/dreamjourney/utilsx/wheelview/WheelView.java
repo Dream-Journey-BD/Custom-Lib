@@ -33,7 +33,7 @@ public class WheelView extends View implements GestureDetector.OnGestureListener
     // Default Variable Here
     public static final float DEFAULT_SPACING_FACTOR = 1.5f;
     public static final float DEFAULT_LINE_RATIO = 0.7f;
-    public static final String DEFAULT_SYMBOL = "°";
+    public static final String DEFAULT_SYMBOL = "";
     public static final int CENTER_TEXT_SIZE_SP = 40;
     public static final int NORMAL_TEXT_SIZE_SP = 27;
     public static final int SMALL_UNIT_TEXT_SIZE_SP = 16;

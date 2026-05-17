@@ -10,6 +10,5 @@
     <string name="alpha_view">Alpha View</string>
     <string name="color_view">Color View</string>
     <string name="selector">Selector</string>
-    <string name="chose_file">Chose File</string>
 
 </resources>
