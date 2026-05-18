@@ -22,10 +22,6 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
-        /*// Call To Chose Image
-        Intent intent = new Intent(Intent.ACTION_PICK);
-        intent.setType("image/*");
-        pickImageLauncher.launch(intent);*/
 
     }
 

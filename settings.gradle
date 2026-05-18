@@ -23,8 +23,9 @@ dependencyResolutionManagement {
 rootProject.name = "Custom Lib"
 include ':app'
 
-// Custom library Here
+//--- Custom library Here ---
 include ':utilsx'
-include ':gpuimage'
+// include ':gpuimage'
+include ':imagetilezoom'
 
 // Example: project(':utilsx').projectDir = new File(rootDir, "utilsx")

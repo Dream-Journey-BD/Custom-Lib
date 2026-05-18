@@ -1,0 +1,1 @@
+# Image Tile Zoom Pro Guard Rules Here
