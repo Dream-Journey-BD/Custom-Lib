@@ -3,7 +3,8 @@ package com.dreamjourney.imagetilezoom.tsak;
 import android.content.Context;
 import android.graphics.Point;
 import android.net.Uri;
-import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.dreamjourney.imagetilezoom.ImageTileZoomView;
@@ -13,16 +14,17 @@ import com.dreamjourney.imagetilezoom.decoder.ImageRegionDecoder;
 import java.lang.ref.WeakReference;
 
 /**
- * Async task used to get image details without blocking the UI thread.
+ * Task used to get image details and initialize the decoder without AsyncTask.
  */
-public class TilesInitTask extends AsyncTask<Void, Void, int[]> {
+public class TilesInitTask implements Runnable {
     private static final String TAG = "TilesInitTask_LOG";
+
     private final WeakReference<ImageTileZoomView> viewRef;
     private final WeakReference<Context> contextRef;
     private final WeakReference<DecoderFactory<? extends ImageRegionDecoder>> decoderFactoryRef;
     private final Uri source;
-    private ImageRegionDecoder decoder;
-    private Exception exception;
+
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     public TilesInitTask(ImageTileZoomView view, Context context, DecoderFactory<? extends ImageRegionDecoder> decoderFactory, Uri source) {
         this.viewRef = new WeakReference<>(view);
@@ -32,19 +34,30 @@ public class TilesInitTask extends AsyncTask<Void, Void, int[]> {
     }
 
     @Override
-    protected int[] doInBackground(Void... params) {
+    public void run() {
+        // Background execution starts here
+        ImageRegionDecoder decoder = null;
+        int[] results = null; // Stores: [width, height, orientation]
+        Exception exception = null;
+
         try {
-            String sourceUri = source.toString();
             Context context = contextRef.get();
             DecoderFactory<? extends ImageRegionDecoder> decoderFactory = decoderFactoryRef.get();
             ImageTileZoomView view = viewRef.get();
+
             if (context != null && decoderFactory != null && view != null) {
-                view.debug("TilesInitTask.doInBackground");
+                view.debug("TilesInitTask.run (Background)");
+
+                // Initialize the decoder
                 decoder = decoderFactory.make();
                 Point dimensions = decoder.init(context, source);
                 int sWidth = dimensions.x;
                 int sHeight = dimensions.y;
-                int exifOrientation = view.getExifOrientation(context, sourceUri);
+
+                // Get rotation from EXIF data
+                int exifOrientation = view.getExifOrientation(context, source.toString());
+
+                // Handle region/cropping if specified
                 if (view.sRegion != null) {
                     view.sRegion.left = Math.max(0, view.sRegion.left);
                     view.sRegion.top = Math.max(0, view.sRegion.top);
@@ -53,24 +66,30 @@ public class TilesInitTask extends AsyncTask<Void, Void, int[]> {
                     sWidth = view.sRegion.width();
                     sHeight = view.sRegion.height();
                 }
-                return new int[]{sWidth, sHeight, exifOrientation};
+
+                results = new int[]{sWidth, sHeight, exifOrientation};
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to initialise bitmap decoder", e);
-            this.exception = e;
+            exception = e;
         }
-        return null;
-    }
 
-    @Override
-    protected void onPostExecute(int[] xyo) {
-        final ImageTileZoomView view = viewRef.get();
-        if (view != null) {
-            if (decoder != null && xyo != null && xyo.length == 3) {
-                view.onTilesInited(decoder, xyo[0], xyo[1], xyo[2]);
-            } else if (exception != null && view.onImageEventListener != null) {
-                view.onImageEventListener.onImageLoadError(exception);
+        // Post results back to the UI thread
+        final ImageRegionDecoder finalDecoder = decoder;
+        final int[] finalResults = results;
+        final Exception finalException = exception;
+
+        mainHandler.post(() -> {
+            ImageTileZoomView view = viewRef.get();
+            if (view != null) {
+                if (finalDecoder != null && finalResults != null) {
+                    // Notify the view that initialization is complete
+                    view.onTilesInited(finalDecoder, finalResults[0], finalResults[1], finalResults[2]);
+                } else if (finalException != null && view.onImageEventListener != null) {
+                    // Notify listener about the error
+                    view.onImageEventListener.onImageLoadError(finalException);
+                }
             }
-        }
+        });
     }
 }

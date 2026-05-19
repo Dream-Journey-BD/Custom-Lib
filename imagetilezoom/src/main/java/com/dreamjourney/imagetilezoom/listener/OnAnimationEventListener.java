@@ -26,6 +26,3 @@ public interface OnAnimationEventListener {
     void onInterruptedByNewAnim();
 
 }
-
-
-

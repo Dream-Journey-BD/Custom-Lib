@@ -42,10 +42,10 @@ public class CompatDecoderFactory<T> implements DecoderFactory<T> {
     @NonNull
     public T make() throws IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         if (bitmapConfig == null) {
-            return clazz.newInstance();
+            return clazz.getDeclaredConstructor().newInstance();
         } else {
-            Constructor<? extends T> ctor = clazz.getConstructor(Bitmap.Config.class);
-            return ctor.newInstance(bitmapConfig);
+            Constructor<? extends T> cTor = clazz.getConstructor(Bitmap.Config.class);
+            return cTor.newInstance(bitmapConfig);
         }
     }
 

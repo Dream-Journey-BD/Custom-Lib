@@ -18,6 +18,7 @@ import android.graphics.RectF;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Handler;
+import android.os.Looper;
 import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
@@ -59,6 +60,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -105,7 +107,10 @@ public class ImageTileZoomView extends View {
      */
     public static final int ORIENTATION_270 = 270;
 
-    private static final List<Integer> VALID_ORIENTATIONS = Arrays.asList(ORIENTATION_0, ORIENTATION_90, ORIENTATION_180, ORIENTATION_270, ORIENTATION_USE_EXIF);
+    private static final List<Integer> VALID_ORIENTATIONS = Arrays.asList(
+            ORIENTATION_0, ORIENTATION_90, ORIENTATION_180,
+            ORIENTATION_270, ORIENTATION_USE_EXIF
+    );
 
     /**
      * During zoom animation, keep the point of the image that was tapped in the same place, and scale the image around it.
@@ -120,7 +125,10 @@ public class ImageTileZoomView extends View {
      */
     public static final int ZOOM_FOCUS_CENTER_IMMEDIATE = 3;
 
-    private static final List<Integer> VALID_ZOOM_STYLES = Arrays.asList(ZOOM_FOCUS_FIXED, ZOOM_FOCUS_CENTER, ZOOM_FOCUS_CENTER_IMMEDIATE);
+    private static final List<Integer> VALID_ZOOM_STYLES = Arrays.asList(
+            ZOOM_FOCUS_FIXED, ZOOM_FOCUS_CENTER,
+            ZOOM_FOCUS_CENTER_IMMEDIATE
+    );
 
     /**
      * Quadratic ease out. Not recommended for scale animation, but good for panning.
@@ -131,7 +139,9 @@ public class ImageTileZoomView extends View {
      */
     public static final int EASE_IN_OUT_QUAD = 2;
 
-    public static final List<Integer> VALID_EASING_STYLES = Arrays.asList(EASE_IN_OUT_QUAD, EASE_OUT_QUAD);
+    public static final List<Integer> VALID_EASING_STYLES = Arrays.asList(
+            EASE_IN_OUT_QUAD, EASE_OUT_QUAD
+    );
 
     /**
      * Don't allow the image to be panned off screen. As much of the image as possible is always displayed, centered in the view when it is smaller. This is the best option for galleries.
@@ -146,7 +156,9 @@ public class ImageTileZoomView extends View {
      */
     public static final int PAN_LIMIT_CENTER = 3;
 
-    private static final List<Integer> VALID_PAN_LIMITS = Arrays.asList(PAN_LIMIT_INSIDE, PAN_LIMIT_OUTSIDE, PAN_LIMIT_CENTER);
+    private static final List<Integer> VALID_PAN_LIMITS = Arrays.asList(
+            PAN_LIMIT_INSIDE, PAN_LIMIT_OUTSIDE, PAN_LIMIT_CENTER
+    );
 
     /**
      * Scale the image so that both dimensions of the image will be equal to or less than the corresponding dimension of the view. The image is then centered in the view. This is the default behaviour and best for galleries.
@@ -165,8 +177,10 @@ public class ImageTileZoomView extends View {
      */
     public static final int SCALE_TYPE_START = 4;
 
-    private static final List<Integer> VALID_SCALE_TYPES = Arrays.asList(SCALE_TYPE_CENTER_CROP, SCALE_TYPE_CENTER_INSIDE, SCALE_TYPE_CUSTOM, SCALE_TYPE_START);
-
+    private static final List<Integer> VALID_SCALE_TYPES = Arrays.asList(
+            SCALE_TYPE_CENTER_CROP, SCALE_TYPE_CENTER_INSIDE,
+            SCALE_TYPE_CUSTOM, SCALE_TYPE_START
+    );
     /**
      * State change originated from animation.
      */
@@ -228,8 +242,8 @@ public class ImageTileZoomView extends View {
     private int maxTileWidth = TILE_SIZE_AUTO;
     private int maxTileHeight = TILE_SIZE_AUTO;
 
-    // An executor service for loading of images
-    private Executor executor = AsyncTask.THREAD_POOL_EXECUTOR;
+    // An Executor service for loading of images
+    private Executor executor;
 
     // Whether tiles should be loaded while gestures and animations are still in progress
     private boolean eagerLoadingEnabled = true;
@@ -258,7 +272,7 @@ public class ImageTileZoomView extends View {
     private PointF sPendingCenter;
     private PointF sRequestedCenter;
 
-    // Source image dimensions and orientation - dimensions relate to the unrotated image
+    // Source image dimensions and orientation - dimensions relate to the unRotated image
     private int sWidth;
     private int sHeight;
     private int sOrientation;
@@ -280,15 +294,15 @@ public class ImageTileZoomView extends View {
 
     // Tile and image decoding
     private ImageRegionDecoder decoder;
-    public final ReadWriteLock decoderLock = new ReentrantReadWriteLock(true);
-    private DecoderFactory<? extends ImageDecoder> bitmapDecoderFactory = new CompatDecoderFactory<ImageDecoder>(SkiaImageDecoder.class);
-    private DecoderFactory<? extends ImageRegionDecoder> regionDecoderFactory = new CompatDecoderFactory<ImageRegionDecoder>(SkiaImageRegionDecoder.class);
+    public final ReadWriteLock decoderLock;
+    private DecoderFactory<? extends ImageDecoder> bitmapDecoderFactory;
+    private DecoderFactory<? extends ImageRegionDecoder> regionDecoderFactory;
 
     // Debug values
     private PointF vCenterStart;
     private float vDistStart;
 
-    // Current quickscale state
+    // Current quickScale state
     private final float quickScaleThreshold;
     private float quickScaleLastDistance;
     private boolean quickScaleMoved;
@@ -343,46 +357,57 @@ public class ImageTileZoomView extends View {
         setDoubleTapZoomDpi(160);
         setMinimumTileDpi(320);
         setGestureDetector(context);
-        this.handler = new Handler(message -> {
+
+        decoderLock = new ReentrantReadWriteLock(true);
+        executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        bitmapDecoderFactory = new CompatDecoderFactory<ImageDecoder>(SkiaImageDecoder.class);
+        regionDecoderFactory = new CompatDecoderFactory<ImageRegionDecoder>(SkiaImageRegionDecoder.class);
+
+        this.handler = new Handler(Looper.getMainLooper(), message -> {
             if (message.what == MESSAGE_LONG_CLICK && onLongClickListener != null) {
                 maxTouchCount = 0;
-                ImageTileZoomView.super.setOnLongClickListener(onLongClickListener);
+                super.setOnLongClickListener(onLongClickListener);
                 performLongClick();
-                ImageTileZoomView.super.setOnLongClickListener(null);
+                super.setOnLongClickListener(null);
             }
             return true;
         });
+
         // Handle XML attributes
         if (attr != null) {
-            TypedArray typedAttr = getContext().obtainStyledAttributes(attr, styleable.SubsamplingScaleImageView);
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_assetName)) {
-                String assetName = typedAttr.getString(styleable.SubsamplingScaleImageView_assetName);
-                if (assetName != null && !assetName.isEmpty()) {
-                    setImage(ImageSource.asset(assetName).tilingEnabled());
+            try (TypedArray typedAttr = getContext().obtainStyledAttributes(attr, styleable.ImageTileZoomView)) {
+                if (typedAttr.hasValue(styleable.ImageTileZoomView_assetName)) {
+                    String assetName = typedAttr.getString(styleable.ImageTileZoomView_assetName);
+                    if (assetName != null && !assetName.isEmpty()) {
+                        setImage(ImageSource.asset(assetName).tilingEnabled());
+                    }
                 }
-            }
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_src)) {
-                int resId = typedAttr.getResourceId(styleable.SubsamplingScaleImageView_src, 0);
-                if (resId > 0) {
-                    setImage(ImageSource.resource(resId).tilingEnabled());
+                if (typedAttr.hasValue(styleable.ImageTileZoomView_src)) {
+                    int resId = typedAttr.getResourceId(styleable.ImageTileZoomView_src, 0);
+                    if (resId > 0) {
+                        setImage(ImageSource.resource(resId).tilingEnabled());
+                    }
                 }
+                if (typedAttr.hasValue(styleable.ImageTileZoomView_panEnabled)) {
+                    setPanEnabled(typedAttr.getBoolean(styleable.ImageTileZoomView_panEnabled, true));
+                }
+                if (typedAttr.hasValue(styleable.ImageTileZoomView_zoomEnabled)) {
+                    setZoomEnabled(typedAttr.getBoolean(styleable.ImageTileZoomView_zoomEnabled, true));
+                }
+                if (typedAttr.hasValue(styleable.ImageTileZoomView_quickScaleEnabled)) {
+                    setQuickScaleEnabled(typedAttr.getBoolean(styleable.ImageTileZoomView_quickScaleEnabled, true));
+                }
+                if (typedAttr.hasValue(styleable.ImageTileZoomView_tileBackgroundColor)) {
+                    setTileBackgroundColor(typedAttr.getColor(styleable.ImageTileZoomView_tileBackgroundColor, Color.argb(0, 0, 0, 0)));
+                }
+
             }
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_panEnabled)) {
-                setPanEnabled(typedAttr.getBoolean(styleable.SubsamplingScaleImageView_panEnabled, true));
-            }
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_zoomEnabled)) {
-                setZoomEnabled(typedAttr.getBoolean(styleable.SubsamplingScaleImageView_zoomEnabled, true));
-            }
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_quickScaleEnabled)) {
-                setQuickScaleEnabled(typedAttr.getBoolean(styleable.SubsamplingScaleImageView_quickScaleEnabled, true));
-            }
-            if (typedAttr.hasValue(styleable.SubsamplingScaleImageView_tileBackgroundColor)) {
-                setTileBackgroundColor(typedAttr.getColor(styleable.SubsamplingScaleImageView_tileBackgroundColor, Color.argb(0, 0, 0, 0)));
-            }
-            typedAttr.recycle();
         }
 
-        quickScaleThreshold = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20, context.getResources().getDisplayMetrics());
+        quickScaleThreshold = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 20,
+                context.getResources().getDisplayMetrics()
+        );
     }
 
     public ImageTileZoomView(Context context) {
@@ -477,7 +502,10 @@ public class ImageTileZoomView extends View {
      * @param previewSource Optional source for a preview image to be displayed and allow interaction while the full size image loads.
      * @param state         State to be restored. Nullable.
      */
-    public final void setImage(@NonNull ImageSource imageSource, ImageSource previewSource, ImageViewState state) {
+    public final void setImage(
+            @NonNull ImageSource imageSource,
+            ImageSource previewSource, ImageViewState state
+    ) {
         //noinspection ConstantConditions
         if (imageSource == null) {
             throw new NullPointerException("imageSource must not be null");
@@ -490,10 +518,14 @@ public class ImageTileZoomView extends View {
 
         if (previewSource != null) {
             if (imageSource.getBitmap() != null) {
-                throw new IllegalArgumentException("Preview image cannot be used when a bitmap is provided for the main image");
+                throw new IllegalArgumentException(
+                        "Preview image cannot be used when a bitmap is provided for the main image"
+                );
             }
             if (imageSource.getSWidth() <= 0 || imageSource.getSHeight() <= 0) {
-                throw new IllegalArgumentException("Preview image cannot be used unless dimensions are provided for the main image");
+                throw new IllegalArgumentException(
+                        "Preview image cannot be used unless dimensions are provided for the main image"
+                );
             }
             this.sWidth = imageSource.getSWidth();
             this.sHeight = imageSource.getSHeight();
@@ -504,7 +536,10 @@ public class ImageTileZoomView extends View {
             } else {
                 Uri uri = previewSource.getUri();
                 if (uri == null && previewSource.getResource() != null) {
-                    uri = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + getContext().getPackageName() + "/" + previewSource.getResource());
+                    uri = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE
+                            + "://" + getContext().getPackageName()
+                            + "/" + previewSource.getResource()
+                    );
                 }
                 BitmapLoadTask task = new BitmapLoadTask(
                         this, getContext(), bitmapDecoderFactory, uri, true
@@ -514,22 +549,37 @@ public class ImageTileZoomView extends View {
         }
 
         if (imageSource.getBitmap() != null && imageSource.getSRegion() != null) {
-            onImageLoaded(Bitmap.createBitmap(imageSource.getBitmap(), imageSource.getSRegion().left, imageSource.getSRegion().top, imageSource.getSRegion().width(), imageSource.getSRegion().height()), ORIENTATION_0, false);
+            onImageLoaded(Bitmap.createBitmap(
+                            imageSource.getBitmap(),
+                            imageSource.getSRegion().left,
+                            imageSource.getSRegion().top,
+                            imageSource.getSRegion().width(),
+                            imageSource.getSRegion().height()),
+                    ORIENTATION_0, false
+            );
         } else if (imageSource.getBitmap() != null) {
             onImageLoaded(imageSource.getBitmap(), ORIENTATION_0, imageSource.isCached());
         } else {
             sRegion = imageSource.getSRegion();
             uri = imageSource.getUri();
             if (uri == null && imageSource.getResource() != null) {
-                uri = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + getContext().getPackageName() + "/" + imageSource.getResource());
+                uri = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://"
+                        + getContext().getPackageName() + "/"
+                        + imageSource.getResource()
+                );
             }
             if (imageSource.getTile() || sRegion != null) {
                 // Load the bitmap using tile decoding.
-                TilesInitTask task = new TilesInitTask(this, getContext(), regionDecoderFactory, uri);
+                TilesInitTask task = new TilesInitTask(
+                        this, getContext(), regionDecoderFactory, uri
+                );
                 execute(task);
             } else {
                 // Load the bitmap as a single image.
-                BitmapLoadTask task = new BitmapLoadTask(this, getContext(), bitmapDecoderFactory, uri, false);
+                BitmapLoadTask task = new BitmapLoadTask(
+                        this, getContext(),
+                        bitmapDecoderFactory, uri, false
+                );
                 execute(task);
             }
         }
@@ -620,12 +670,15 @@ public class ImageTileZoomView extends View {
                         || Math.abs(e1.getY() - e2.getY()) > 50) && (Math.abs(velocityX) > 500
                         || Math.abs(velocityY) > 500) && !isZooming
                 ) {
-                    PointF vTranslateEnd = new PointF(vTranslate.x + (velocityX * 0.25f), vTranslate.y + (velocityY * 0.25f));
+                    PointF vTranslateEnd = new PointF(
+                            vTranslate.x + (velocityX * 0.25f),
+                            vTranslate.y + (velocityY * 0.25f)
+                    );
                     float sCenterXEnd = (((float) getWidth() / 2) - vTranslateEnd.x) / scale;
                     float sCenterYEnd = (((float) getHeight() / 2) - vTranslateEnd.y) / scale;
                     new AnimationBuilder(new PointF(sCenterXEnd, sCenterYEnd))
                             .withEasing(EASE_OUT_QUAD)
-                            .withPanLimited(false)
+                            .withPanLimited()
                             .withOrigin(ORIGIN_FLING).start();
                     return true;
                 }
@@ -641,12 +694,16 @@ public class ImageTileZoomView extends View {
             @Override
             public boolean onDoubleTap(@NonNull MotionEvent e) {
                 if (zoomEnabled && readySent && vTranslate != null) {
-                    // Hacky solution for #15 - after a double tap the GestureDetector gets in a state
-                    // where the next fling is ignored, so here we replace it with a new one.
+                    /*
+                    Hacky solution for #15 - after a double tap the GestureDetector gets in a state
+                    where the next fling is ignored, so here we replace it with a new one.
+                    */
                     setGestureDetector(context);
                     if (quickScaleEnabled) {
-                        // Store quick scale params. This will become either a double tap zoom or a
-                        // quick scale depending on whether the user swipes.
+                        /*
+                        Store quick scale params. This will become either a double tap zoom or a
+                        quick scale depending on whether the user swipes.
+                        */
                         vCenterStart = new PointF(e.getX(), e.getY());
                         vTranslateStart = new PointF(vTranslate.x, vTranslate.y);
                         scaleStart = scale;
@@ -661,7 +718,10 @@ public class ImageTileZoomView extends View {
                         return false;
                     } else {
                         // Start double tap zoom animation.
-                        doubleTapZoom(viewToSourceCoord(new PointF(e.getX(), e.getY())), new PointF(e.getX(), e.getY()));
+                        doubleTapZoom(viewToSourceCoord(
+                                        new PointF(e.getX(), e.getY())),
+                                new PointF(e.getX(), e.getY())
+                        );
                         return true;
                     }
                 }
@@ -788,12 +848,23 @@ public class ImageTileZoomView extends View {
                 maxTouchCount = Math.max(maxTouchCount, touchCount);
                 if (touchCount >= 2) {
                     if (zoomEnabled) {
-                        // Start pinch to zoom. Calculate distance between touch points and center point of the pinch.
-                        float distance = distance(event.getX(0), event.getX(1), event.getY(0), event.getY(1));
+                        /*
+                        Start pinch to zoom.
+                        Calculate distance between touch points and center point of the pinch.
+                        */
+                        float distance = distance(
+                                event.getX(0),
+                                event.getX(1),
+                                event.getY(0),
+                                event.getY(1)
+                        );
                         scaleStart = scale;
                         vDistStart = distance;
                         vTranslateStart.set(vTranslate.x, vTranslate.y);
-                        vCenterStart.set((event.getX(0) + event.getX(1)) / 2, (event.getY(0) + event.getY(1)) / 2);
+                        vCenterStart.set(
+                                (event.getX(0) + event.getX(1)) / 2,
+                                (event.getY(0) + event.getY(1)) / 2
+                        );
                     } else {
                         // Abort all gestures on second touch
                         maxTouchCount = 0;
@@ -813,12 +884,23 @@ public class ImageTileZoomView extends View {
                 boolean consumed = false;
                 if (maxTouchCount > 0) {
                     if (touchCount >= 2) {
-                        // Calculate new distance between touch points, to scale and pan relative to start values.
-                        float vDistEnd = distance(event.getX(0), event.getX(1), event.getY(0), event.getY(1));
+                        /*
+                        Calculate new distance between touch points,
+                        to scale and pan relative to start values.
+                        * */
+                        float vDistEnd = distance(
+                                event.getX(0),
+                                event.getX(1),
+                                event.getY(0),
+                                event.getY(1)
+                        );
                         float vCenterEndX = (event.getX(0) + event.getX(1)) / 2;
                         float vCenterEndY = (event.getY(0) + event.getY(1)) / 2;
 
-                        if (zoomEnabled && (distance(vCenterStart.x, vCenterEndX, vCenterStart.y, vCenterEndY) > 5 || Math.abs(vDistEnd - vDistStart) > 5 || isPanning)) {
+                        if (zoomEnabled &&
+                                (distance(vCenterStart.x, vCenterEndX, vCenterStart.y, vCenterEndY) > 5
+                                        || Math.abs(vDistEnd - vDistStart) > 5 || isPanning)
+                        ) {
                             isZooming = true;
                             isPanning = true;
                             consumed = true;
@@ -827,21 +909,31 @@ public class ImageTileZoomView extends View {
                             scale = Math.min(maxScale, (vDistEnd / vDistStart) * scaleStart);
 
                             if (scale <= minScale()) {
-                                // Minimum scale reached so don't pan. Adjust start settings so any expand will zoom in.
+                                /*
+                                Minimum scale reached so don't pan.
+                                Adjust start settings so any expand will zoom in.
+                                */
                                 vDistStart = vDistEnd;
                                 scaleStart = minScale();
                                 vCenterStart.set(vCenterEndX, vCenterEndY);
                                 vTranslateStart.set(vTranslate);
                             } else if (panEnabled) {
-                                // Translate to place the source image coordinate that was at the center of the pinch at the start
-                                // at the center of the pinch now, to give simultaneous pan + zoom.
+                                /*
+                                Translate to place the source image coordinate
+                                that was at the center of the pinch at the start
+                                at the center of the pinch now, to give simultaneous pan + zoom.
+                                */
                                 float vLeftStart = vCenterStart.x - vTranslateStart.x;
                                 float vTopStart = vCenterStart.y - vTranslateStart.y;
                                 float vLeftNow = vLeftStart * (scale / scaleStart);
                                 float vTopNow = vTopStart * (scale / scaleStart);
                                 vTranslate.x = vCenterEndX - vLeftNow;
                                 vTranslate.y = vCenterEndY - vTopNow;
-                                if ((previousScale * sHeight() < getHeight() && scale * sHeight() >= getHeight()) || (previousScale * sWidth() < getWidth() && scale * sWidth() >= getWidth())) {
+                                if ((previousScale * sHeight() < getHeight()
+                                        && scale * sHeight() >= getHeight())
+                                        || (previousScale * sWidth() < getWidth()
+                                        && scale * sWidth() >= getWidth())
+                                ) {
                                     fitToBounds(true);
                                     vCenterStart.set(vCenterEndX, vCenterEndY);
                                     vTranslateStart.set(vTranslate);
@@ -864,7 +956,8 @@ public class ImageTileZoomView extends View {
                     } else if (isQuickScaling) {
                         // One finger zoom
                         // Stole Google's Magical Formula™ to make sure it feels the exact same
-                        float dist = Math.abs(quickScaleVStart.y - event.getY()) * 2 + quickScaleThreshold;
+                        float dist = Math.abs(quickScaleVStart.y - event.getY())
+                                * 2 + quickScaleThreshold;
 
                         if (quickScaleLastDistance == -1f) {
                             quickScaleLastDistance = dist;
@@ -892,9 +985,14 @@ public class ImageTileZoomView extends View {
                                 float vTopNow = vTopStart * (scale / scaleStart);
                                 vTranslate.x = vCenterStart.x - vLeftNow;
                                 vTranslate.y = vCenterStart.y - vTopNow;
-                                if ((previousScale * sHeight() < getHeight() && scale * sHeight() >= getHeight()) || (previousScale * sWidth() < getWidth() && scale * sWidth() >= getWidth())) {
+                                if ((previousScale * sHeight() < getHeight()
+                                        && scale * sHeight() >= getHeight())
+                                        || (previousScale * sWidth() < getWidth()
+                                        && scale * sWidth() >= getWidth())
+                                ) {
                                     fitToBounds(true);
-                                    vCenterStart.set(sourceToViewCoord(quickScaleSCenter));
+                                    PointF vCenterTarget = sourceToViewCoord(quickScaleSCenter);
+                                    if (vCenterTarget != null) vCenterStart.set(vCenterTarget);
                                     vTranslateStart.set(vTranslate);
                                     scaleStart = scale;
                                     dist = 0;
@@ -917,8 +1015,11 @@ public class ImageTileZoomView extends View {
 
                         consumed = true;
                     } else if (!isZooming) {
-                        // One finger pan - translate the image. We do this calculation even with pan disabled so click
-                        // and long click behaviour is preserved.
+                        /*
+                        One finger pan - translate the image.
+                        We do this calculation even with pan disabled so click
+                        and long click behaviour is preserved.
+                        */
                         float dx = Math.abs(event.getX() - vCenterStart.x);
                         float dy = Math.abs(event.getY() - vCenterStart.y);
 
@@ -940,7 +1041,10 @@ public class ImageTileZoomView extends View {
                             if (!edgeXSwipe && !edgeYSwipe && (!atXEdge || !atYEdge || yPan || isPanning)) {
                                 isPanning = true;
                             } else if (dx > offset || dy > offset) {
-                                // Haven't panned the image, and we're at the left or right edge. Switch to page swipe.
+                                /*
+                                Haven't panned the image, and we're at the left or right edge.
+                                Switch to page swipe.
+                                */
                                 maxTouchCount = 0;
                                 handler.removeMessages(MESSAGE_LONG_CLICK);
                                 requestDisallowInterceptTouchEvent(false);
@@ -1028,15 +1132,23 @@ public class ImageTileZoomView extends View {
                 sCenter.y = (float) sHeight() / 2;
             }
         }
-        float doubleTapZoomScale = Math.min(maxScale, ImageTileZoomView.this.doubleTapZoomScale);
+        float doubleTapZoomScale = Math.min(maxScale, this.doubleTapZoomScale);
         boolean zoomIn = (scale <= doubleTapZoomScale * 0.9) || scale == minScale;
         float targetScale = zoomIn ? doubleTapZoomScale : minScale();
         if (doubleTapZoomStyle == ZOOM_FOCUS_CENTER_IMMEDIATE) {
             setScaleAndCenter(targetScale, sCenter);
         } else if (doubleTapZoomStyle == ZOOM_FOCUS_CENTER || !zoomIn || !panEnabled) {
-            new AnimationBuilder(targetScale, sCenter).withInterruptible(false).withDuration(doubleTapZoomDuration).withOrigin(ORIGIN_DOUBLE_TAP_ZOOM).start();
+            new AnimationBuilder(targetScale, sCenter)
+                    .withInterruptible(false)
+                    .withDuration(doubleTapZoomDuration)
+                    .withOrigin(ORIGIN_DOUBLE_TAP_ZOOM)
+                    .start();
         } else if (doubleTapZoomStyle == ZOOM_FOCUS_FIXED) {
-            new AnimationBuilder(targetScale, sCenter, vFocus).withInterruptible(false).withDuration(doubleTapZoomDuration).withOrigin(ORIGIN_DOUBLE_TAP_ZOOM).start();
+            new AnimationBuilder(targetScale, sCenter, vFocus)
+                    .withInterruptible(false)
+                    .withDuration(doubleTapZoomDuration)
+                    .withOrigin(ORIGIN_DOUBLE_TAP_ZOOM)
+                    .start();
         }
         invalidate();
     }
@@ -1055,14 +1167,19 @@ public class ImageTileZoomView extends View {
             return;
         }
 
-        // When using tiles, on first render with no tile map ready, initialise it and kick off async base image loading.
+        /*
+        When using tiles, on first render with no tile map ready,
+        initialise it and kick off async base image loading.
+        */
         if (tileMap == null && decoder != null) {
             initialiseBaseLayer(getMaxBitmapDimensions(canvas));
         }
 
-        // If image has been loaded or supplied as a bitmap, onDraw may be the first time the view has
-        // dimensions and therefore the first opportunity to set scale and translate. If this call returns
-        // false there is nothing to be drawn so return immediately.
+        /*
+        If image has been loaded or supplied as a bitmap, onDraw may be the first time the view has
+        dimensions and therefore the first opportunity to set scale and translate. If this call returns
+        false there is nothing to be drawn so return immediately.
+        */
         if (!checkReady()) {
             return;
         }
@@ -1082,16 +1199,32 @@ public class ImageTileZoomView extends View {
             long scaleElapsed = System.currentTimeMillis() - anim.time;
             boolean finished = scaleElapsed > anim.duration;
             scaleElapsed = Math.min(scaleElapsed, anim.duration);
-            scale = ease(anim.easing, scaleElapsed, anim.scaleStart, anim.scaleEnd - anim.scaleStart, anim.duration);
+            scale = ease(
+                    anim.easing, scaleElapsed, anim.scaleStart,
+                    anim.scaleEnd - anim.scaleStart, anim.duration
+            );
 
             // Apply required animation to the focal point
-            float vFocusNowX = ease(anim.easing, scaleElapsed, anim.vFocusStart.x, anim.vFocusEnd.x - anim.vFocusStart.x, anim.duration);
-            float vFocusNowY = ease(anim.easing, scaleElapsed, anim.vFocusStart.y, anim.vFocusEnd.y - anim.vFocusStart.y, anim.duration);
-            // Find out where the focal point is at this scale and adjust its position to follow the animation path
+            float vFocusNowX = ease(
+                    anim.easing, scaleElapsed, anim.vFocusStart.x,
+                    anim.vFocusEnd.x - anim.vFocusStart.x, anim.duration
+            );
+            float vFocusNowY = ease(
+                    anim.easing, scaleElapsed, anim.vFocusStart.y,
+                    anim.vFocusEnd.y - anim.vFocusStart.y, anim.duration
+            );
+
+            /*
+            Find out where the focal point is at this
+            scale and adjust its position to follow the animation path
+            */
             vTranslate.x -= sourceToViewX(anim.sCenterEnd.x) - vFocusNowX;
             vTranslate.y -= sourceToViewY(anim.sCenterEnd.y) - vFocusNowY;
 
-            // For translate anims, showing the image non-centered is never allowed, for scaling anims it is during the animation.
+            /*
+            For translate anims, showing the image non-centered is never allowed,
+            for scaling anims it is during the animation.
+            */
             fitToBounds(finished || (anim.scaleStart == anim.scaleEnd));
             sendStateChanged(scaleBefore, vTranslateBefore, anim.origin);
             refreshRequiredTiles(finished);
@@ -1113,7 +1246,10 @@ public class ImageTileZoomView extends View {
             // Optimum sample size for current scale
             int sampleSize = Math.min(fullImageSampleSize, calculateInSampleSize(scale));
 
-            // First check for missing tiles - if there are any we need the base layer underneath to avoid gaps
+            /*
+            First check for missing tiles -
+            if there are any we need the base layer underneath to avoid gaps
+            */
             boolean hasMissingTiles = false;
             for (Map.Entry<Integer, List<Tile>> tileMapEntry : tileMap.entrySet()) {
                 if (tileMapEntry.getKey() == sampleSize) {
@@ -1126,7 +1262,10 @@ public class ImageTileZoomView extends View {
                 }
             }
 
-            // Render all loaded tiles. LinkedHashMap used for bottom up rendering - lower res tiles underneath.
+            /*
+            Render all loaded tiles.
+            LinkedHashMap used for bottom up rendering- lower res tiles underneath.
+            */
             for (Map.Entry<Integer, List<Tile>> tileMapEntry : tileMap.entrySet()) {
                 if (tileMapEntry.getKey() == sampleSize || hasMissingTiles) {
                     for (Tile tile : tileMapEntry.getValue()) {
@@ -1139,15 +1278,44 @@ public class ImageTileZoomView extends View {
                                 matrix = new Matrix();
                             }
                             matrix.reset();
-                            setMatrixArray(srcArray, 0, 0, tile.bitmap.getWidth(), 0, tile.bitmap.getWidth(), tile.bitmap.getHeight(), 0, tile.bitmap.getHeight());
+                            setMatrixArray(srcArray, 0, 0,
+                                    tile.bitmap.getWidth(), 0,
+                                    tile.bitmap.getWidth(),
+                                    tile.bitmap.getHeight(), 0,
+                                    tile.bitmap.getHeight()
+                            );
                             if (getRequiredRotation() == ORIENTATION_0) {
-                                setMatrixArray(dstArray, tile.vRect.left, tile.vRect.top, tile.vRect.right, tile.vRect.top, tile.vRect.right, tile.vRect.bottom, tile.vRect.left, tile.vRect.bottom);
+                                setMatrixArray(
+                                        dstArray, tile.vRect.left,
+                                        tile.vRect.top, tile.vRect.right,
+                                        tile.vRect.top, tile.vRect.right,
+                                        tile.vRect.bottom, tile.vRect.left,
+                                        tile.vRect.bottom
+                                );
                             } else if (getRequiredRotation() == ORIENTATION_90) {
-                                setMatrixArray(dstArray, tile.vRect.right, tile.vRect.top, tile.vRect.right, tile.vRect.bottom, tile.vRect.left, tile.vRect.bottom, tile.vRect.left, tile.vRect.top);
+                                setMatrixArray(
+                                        dstArray, tile.vRect.right,
+                                        tile.vRect.top, tile.vRect.right,
+                                        tile.vRect.bottom, tile.vRect.left,
+                                        tile.vRect.bottom, tile.vRect.left,
+                                        tile.vRect.top
+                                );
                             } else if (getRequiredRotation() == ORIENTATION_180) {
-                                setMatrixArray(dstArray, tile.vRect.right, tile.vRect.bottom, tile.vRect.left, tile.vRect.bottom, tile.vRect.left, tile.vRect.top, tile.vRect.right, tile.vRect.top);
+                                setMatrixArray(
+                                        dstArray, tile.vRect.right,
+                                        tile.vRect.bottom, tile.vRect.left,
+                                        tile.vRect.bottom, tile.vRect.left,
+                                        tile.vRect.top, tile.vRect.right,
+                                        tile.vRect.top
+                                );
                             } else if (getRequiredRotation() == ORIENTATION_270) {
-                                setMatrixArray(dstArray, tile.vRect.left, tile.vRect.bottom, tile.vRect.left, tile.vRect.top, tile.vRect.right, tile.vRect.top, tile.vRect.right, tile.vRect.bottom);
+                                setMatrixArray(
+                                        dstArray, tile.vRect.left,
+                                        tile.vRect.bottom, tile.vRect.left,
+                                        tile.vRect.top, tile.vRect.right,
+                                        tile.vRect.top, tile.vRect.right,
+                                        tile.vRect.bottom
+                                );
                             }
                             matrix.setPolyToPoly(srcArray, 0, dstArray, 0, 4);
                             canvas.drawBitmap(tile.bitmap, matrix, bitmapPaint);
@@ -1155,10 +1323,21 @@ public class ImageTileZoomView extends View {
                                 canvas.drawRect(tile.vRect, debugLinePaint);
                             }
                         } else if (tile.loading && debug) {
-                            canvas.drawText("LOADING", tile.vRect.left + px(5), tile.vRect.top + px(35), debugTextPaint);
+                            canvas.drawText("LOADING",
+                                    tile.vRect.left + px(5),
+                                    tile.vRect.top + px(35),
+                                    debugTextPaint
+                            );
                         }
                         if (tile.visible && debug) {
-                            canvas.drawText("ISS " + tile.sampleSize + " RECT " + tile.sRect.top + "," + tile.sRect.left + "," + tile.sRect.bottom + "," + tile.sRect.right, tile.vRect.left + px(5), tile.vRect.top + px(15), debugTextPaint);
+                            canvas.drawText(
+                                    "ISS " + tile.sampleSize + " RECT " + tile.sRect.top + ","
+                                            + tile.sRect.left + "," + tile.sRect.bottom + ","
+                                            + tile.sRect.right,
+                                    tile.vRect.left + px(5),
+                                    tile.vRect.top + px(15),
+                                    debugTextPaint
+                            );
                         }
                     }
                 }
@@ -1203,11 +1382,26 @@ public class ImageTileZoomView extends View {
         }
 
         if (debug) {
-            canvas.drawText("Scale: " + String.format(Locale.ENGLISH, "%.2f", scale) + " (" + String.format(Locale.ENGLISH, "%.2f", minScale()) + " - " + String.format(Locale.ENGLISH, "%.2f", maxScale) + ")", px(5), px(15), debugTextPaint);
-            canvas.drawText("Translate: " + String.format(Locale.ENGLISH, "%.2f", vTranslate.x) + ":" + String.format(Locale.ENGLISH, "%.2f", vTranslate.y), px(5), px(30), debugTextPaint);
+            canvas.drawText("Scale: "
+                    + String.format(Locale.ENGLISH, "%.2f", scale)
+                    + " (" + String.format(Locale.ENGLISH, "%.2f", minScale())
+                    + " - " + String.format(Locale.ENGLISH, "%.2f", maxScale)
+                    + ")", px(5), px(15), debugTextPaint
+            );
+            canvas.drawText("Translate: "
+                            + String.format(Locale.ENGLISH, "%.2f", vTranslate.x)
+                            + ":"
+                            + String.format(Locale.ENGLISH, "%.2f", vTranslate.y),
+                    px(5), px(30), debugTextPaint
+            );
             PointF center = getCenter();
             //noinspection ConstantConditions
-            canvas.drawText("Source center: " + String.format(Locale.ENGLISH, "%.2f", center.x) + ":" + String.format(Locale.ENGLISH, "%.2f", center.y), px(5), px(45), debugTextPaint);
+            canvas.drawText("Source center: "
+                            + String.format(Locale.ENGLISH, "%.2f", center.x)
+                            + ":"
+                            + String.format(Locale.ENGLISH, "%.2f", center.y),
+                    px(5), px(45), debugTextPaint
+            );
             if (anim != null) {
                 PointF vCenterStart = sourceToViewCoord(anim.sCenterStart);
                 PointF vCenterEndRequested = sourceToViewCoord(anim.sCenterEndRequested);
@@ -1216,12 +1410,25 @@ public class ImageTileZoomView extends View {
                 canvas.drawCircle(vCenterStart.x, vCenterStart.y, px(10), debugLinePaint);
                 debugLinePaint.setColor(Color.RED);
                 //noinspection ConstantConditions
-                canvas.drawCircle(vCenterEndRequested.x, vCenterEndRequested.y, px(20), debugLinePaint);
+                canvas.drawCircle(
+                        vCenterEndRequested.x,
+                        vCenterEndRequested.y,
+                        px(20), debugLinePaint
+                );
                 debugLinePaint.setColor(Color.BLUE);
                 //noinspection ConstantConditions
-                canvas.drawCircle(vCenterEnd.x, vCenterEnd.y, px(25), debugLinePaint);
+                canvas.drawCircle(
+                        vCenterEnd.x,
+                        vCenterEnd.y,
+                        px(25),
+                        debugLinePaint
+                );
                 debugLinePaint.setColor(Color.CYAN);
-                canvas.drawCircle((float) getWidth() / 2, (float) getHeight() / 2, px(30), debugLinePaint);
+                canvas.drawCircle(
+                        (float) getWidth() / 2,
+                        (float) getHeight() / 2,
+                        px(30), debugLinePaint
+                );
             }
             if (vCenterStart != null) {
                 debugLinePaint.setColor(Color.RED);
@@ -1229,7 +1436,11 @@ public class ImageTileZoomView extends View {
             }
             if (quickScaleSCenter != null) {
                 debugLinePaint.setColor(Color.BLUE);
-                canvas.drawCircle(sourceToViewX(quickScaleSCenter.x), sourceToViewY(quickScaleSCenter.y), px(35), debugLinePaint);
+                canvas.drawCircle(
+                        sourceToViewX(quickScaleSCenter.x),
+                        sourceToViewY(quickScaleSCenter.y),
+                        px(35), debugLinePaint
+                );
             }
             if (quickScaleVStart != null && isQuickScaling) {
                 debugLinePaint.setColor(Color.CYAN);
@@ -1351,33 +1562,43 @@ public class ImageTileZoomView extends View {
         satTemp = new ScaleAndTranslate(0f, new PointF(0, 0));
         fitToBounds(true, satTemp);
 
-        // Load double resolution - next level will be split into four tiles and at the center all four are required,
-        // so don't bother with tiling until the next level 16 tiles are needed.
+        /*
+        Load double resolution - next level will be split into four tiles
+        and at the center all four are required,
+        so don't bother with tiling until the next level 16 tiles are needed.
+        */
         fullImageSampleSize = calculateInSampleSize(satTemp.scale);
         if (fullImageSampleSize > 1) {
             fullImageSampleSize /= 2;
         }
 
-        if (fullImageSampleSize == 1 && sRegion == null && sWidth() < maxTileDimensions.x && sHeight() < maxTileDimensions.y) {
+        if (fullImageSampleSize == 1
+                && sRegion == null
+                && sWidth() < maxTileDimensions.x && sHeight()
+                < maxTileDimensions.y
+        ) {
 
-            // Whole image is required at native resolution, and is smaller than the canvas max bitmap size.
-            // Use BitmapDecoder for better image support.
+            /*
+            Whole image is required at native resolution, and is smaller than the canvas max bitmap size.
+            Use BitmapDecoder for better image support.
+            */
             decoder.recycle();
             decoder = null;
-            BitmapLoadTask task = new BitmapLoadTask(this, getContext(), bitmapDecoderFactory, uri, false);
+            BitmapLoadTask task = new BitmapLoadTask(
+                    this, getContext(), bitmapDecoderFactory, uri, false
+            );
             execute(task);
 
         } else {
-
             initialiseTileMap(maxTileDimensions);
-
             List<Tile> baseGrid = tileMap.get(fullImageSampleSize);
-            for (Tile baseTile : baseGrid) {
-                TileLoadTask task = new TileLoadTask(this, decoder, baseTile);
-                execute(task);
+            if (baseGrid != null) {
+                for (Tile baseTile : baseGrid) {
+                    TileLoadTask task = new TileLoadTask(this, decoder, baseTile);
+                    execute(task);
+                }
             }
             refreshRequiredTiles(true);
-
         }
 
     }
@@ -1395,11 +1616,18 @@ public class ImageTileZoomView extends View {
 
         int sampleSize = Math.min(fullImageSampleSize, calculateInSampleSize(scale));
 
-        // Load tiles of the correct sample size that are on screen. Discard tiles off screen, and those that are higher
-        // resolution than required, or lower res than required but not the base layer, so the base layer is always present.
+        /*
+            Load tiles of the correct sample size that are on screen.
+            Discard tiles off screen, and those that are higher
+            resolution than required, or lower res than required but not the base layer,
+            so the base layer is always present.
+        */
         for (Map.Entry<Integer, List<Tile>> tileMapEntry : tileMap.entrySet()) {
             for (Tile tile : tileMapEntry.getValue()) {
-                if (tile.sampleSize < sampleSize || (tile.sampleSize > sampleSize && tile.sampleSize != fullImageSampleSize)) {
+                if (tile.sampleSize < sampleSize
+                        || (tile.sampleSize > sampleSize
+                        && tile.sampleSize != fullImageSampleSize)
+                ) {
                     tile.visible = false;
                     if (tile.bitmap != null) {
                         tile.bitmap.recycle();
@@ -1538,8 +1766,13 @@ public class ImageTileZoomView extends View {
         }
 
         // Asymmetric padding adjustments
-        float xPaddingRatio = getPaddingLeft() > 0 || getPaddingRight() > 0 ? getPaddingLeft() / (float) (getPaddingLeft() + getPaddingRight()) : 0.5f;
-        float yPaddingRatio = getPaddingTop() > 0 || getPaddingBottom() > 0 ? getPaddingTop() / (float) (getPaddingTop() + getPaddingBottom()) : 0.5f;
+        float xPaddingRatio = getPaddingLeft() > 0 ||
+                getPaddingRight() > 0 ? getPaddingLeft() /
+                (float) (getPaddingLeft() + getPaddingRight()) : 0.5f;
+
+        float yPaddingRatio = getPaddingTop() > 0 ||
+                getPaddingBottom() > 0 ? getPaddingTop() /
+                (float) (getPaddingTop() + getPaddingBottom()) : 0.5f;
 
         float maxTx;
         float maxTy;
@@ -1592,7 +1825,10 @@ public class ImageTileZoomView extends View {
      * Once source image and view dimensions are known, creates a map of sample size to tile grid.
      */
     private void initialiseTileMap(Point maxTileDimensions) {
-        debug("initialiseTileMap maxTileDimensions=%dx%d", maxTileDimensions.x, maxTileDimensions.y);
+        debug(
+                "initialiseTileMap maxTileDimensions=%dx%d",
+                maxTileDimensions.x, maxTileDimensions.y
+        );
         this.tileMap = new LinkedHashMap<>();
         int sampleSize = fullImageSampleSize;
         int xTiles = 1;
@@ -1603,7 +1839,8 @@ public class ImageTileZoomView extends View {
             int subTileWidth = sTileWidth / sampleSize;
             int subTileHeight = sTileHeight / sampleSize;
             while (subTileWidth + xTiles + 1 > maxTileDimensions.x ||
-                    (subTileWidth > getWidth() * 1.25 && sampleSize < fullImageSampleSize)) {
+                    (subTileWidth > getWidth() * 1.25 && sampleSize < fullImageSampleSize)
+            ) {
                 xTiles += 1;
                 sTileWidth = sWidth() / xTiles;
                 subTileWidth = sTileWidth / sampleSize;
@@ -1642,14 +1879,21 @@ public class ImageTileZoomView extends View {
         }
     }
 
-
     /**
      * Called by worker task when decoder is ready and image size and EXIF orientation is known.
      */
-    public synchronized void onTilesInited(ImageRegionDecoder decoder, int sWidth, int sHeight, int sOrientation) {
-        debug("onTilesInited sWidth=%d, sHeight=%d, sOrientation=%d", sWidth, sHeight, orientation);
+    public synchronized void onTilesInited(
+            ImageRegionDecoder decoder, int sWidth,
+            int sHeight, int sOrientation
+    ) {
+        debug("onTilesInited sWidth=%d, sHeight=%d, sOrientation=%d",
+                sWidth, sHeight, orientation
+        );
         // If actual dimensions don't match the declared size, reset everything.
-        if (this.sWidth > 0 && this.sHeight > 0 && (this.sWidth != sWidth || this.sHeight != sHeight)) {
+        if (this.sWidth > 0 && this.sHeight > 0
+                && (this.sWidth != sWidth
+                || this.sHeight != sHeight)
+        ) {
             reset(false);
             if (bitmap != null) {
                 if (!bitmapIsCached) {
@@ -1668,7 +1912,12 @@ public class ImageTileZoomView extends View {
         this.sHeight = sHeight;
         this.sOrientation = sOrientation;
         checkReady();
-        if (!checkImageLoaded() && maxTileWidth > 0 && maxTileWidth != TILE_SIZE_AUTO && maxTileHeight > 0 && maxTileHeight != TILE_SIZE_AUTO && getWidth() > 0 && getHeight() > 0) {
+        if (!checkImageLoaded() && maxTileWidth > 0
+                && maxTileWidth != TILE_SIZE_AUTO
+                && maxTileHeight > 0 && maxTileHeight
+                != TILE_SIZE_AUTO && getWidth() > 0
+                && getHeight() > 0
+        ) {
             initialiseBaseLayer(new Point(maxTileWidth, maxTileHeight));
         }
         invalidate();
@@ -1697,7 +1946,6 @@ public class ImageTileZoomView extends View {
         invalidate();
     }
 
-
     /**
      * Called by worker task when preview image is loaded.
      */
@@ -1708,7 +1956,10 @@ public class ImageTileZoomView extends View {
             return;
         }
         if (pRegion != null) {
-            bitmap = Bitmap.createBitmap(previewBitmap, pRegion.left, pRegion.top, pRegion.width(), pRegion.height());
+            bitmap = Bitmap.createBitmap(
+                    previewBitmap, pRegion.left,
+                    pRegion.top, pRegion.width(), pRegion.height()
+            );
         } else {
             bitmap = previewBitmap;
         }
@@ -1725,7 +1976,9 @@ public class ImageTileZoomView extends View {
     public synchronized void onImageLoaded(Bitmap bitmap, int sOrientation, boolean bitmapIsCached) {
         debug("onImageLoaded");
         // If actual dimensions don't match the declared size, reset everything.
-        if (this.sWidth > 0 && this.sHeight > 0 && (this.sWidth != bitmap.getWidth() || this.sHeight != bitmap.getHeight())) {
+        if (this.sWidth > 0 && this.sHeight > 0 &&
+                (this.sWidth != bitmap.getWidth() || this.sHeight != bitmap.getHeight())
+        ) {
             reset(false);
         }
         if (this.bitmap != null && !this.bitmapIsCached) {
@@ -1756,16 +2009,24 @@ public class ImageTileZoomView extends View {
      */
     @AnyThread
     public int getExifOrientation(Context context, String sourceUri) {
+        // Initialized with ORIENTATION_0 (default value)
         int exifOrientation = ORIENTATION_0;
+
         if (sourceUri.startsWith(ContentResolver.SCHEME_CONTENT)) {
             Cursor cursor = null;
             try {
                 String[] columns = {MediaStore.Images.Media.ORIENTATION};
-                cursor = context.getContentResolver().query(Uri.parse(sourceUri), columns, null, null, null);
+                cursor = context.getContentResolver().query(Uri.parse(
+                                sourceUri), columns, null,
+                        null, null
+                );
+
                 if (cursor != null) {
                     if (cursor.moveToFirst()) {
                         int orientation = cursor.getInt(0);
-                        if (VALID_ORIENTATIONS.contains(orientation) && orientation != ORIENTATION_USE_EXIF) {
+                        if (VALID_ORIENTATIONS.contains(
+                                orientation) && orientation != ORIENTATION_USE_EXIF
+                        ) {
                             exifOrientation = orientation;
                         } else {
                             Log.w(TAG, "Unsupported orientation: " + orientation);
@@ -1779,19 +2040,30 @@ public class ImageTileZoomView extends View {
                     cursor.close();
                 }
             }
-        } else if (sourceUri.startsWith(ImageSource.FILE_SCHEME) && !sourceUri.startsWith(ImageSource.ASSET_SCHEME)) {
+        } else if (sourceUri.startsWith(ImageSource.FILE_SCHEME) &&
+                !sourceUri.startsWith(ImageSource.ASSET_SCHEME)) {
             try {
-                ExifInterface exifInterface = new ExifInterface(sourceUri.substring(ImageSource.FILE_SCHEME.length() - 1));
-                int orientationAttr = exifInterface.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
-                if (orientationAttr == ExifInterface.ORIENTATION_NORMAL || orientationAttr == ExifInterface.ORIENTATION_UNDEFINED) {
-                    exifOrientation = ORIENTATION_0;
-                } else if (orientationAttr == ExifInterface.ORIENTATION_ROTATE_90) {
+
+                ExifInterface exifInterface = new ExifInterface(
+                        sourceUri.substring(ImageSource.FILE_SCHEME.length() - 1)
+                );
+
+                int orientationAttr = exifInterface.getAttributeInt(
+                        ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL
+                );
+
+                /* Fixed: Removed "exifOrientation = ORIENTATION_0"
+                   because it's already assigned at the start
+                 */
+                if (orientationAttr == ExifInterface.ORIENTATION_ROTATE_90) {
                     exifOrientation = ORIENTATION_90;
                 } else if (orientationAttr == ExifInterface.ORIENTATION_ROTATE_180) {
                     exifOrientation = ORIENTATION_180;
                 } else if (orientationAttr == ExifInterface.ORIENTATION_ROTATE_270) {
                     exifOrientation = ORIENTATION_270;
-                } else {
+                } else if (orientationAttr != ExifInterface.ORIENTATION_NORMAL
+                        && orientationAttr != ExifInterface.ORIENTATION_UNDEFINED) {
+                    // Log a warning only if it's an unrecognized orientation
                     Log.w(TAG, "Unsupported EXIF orientation: " + orientationAttr);
                 }
             } catch (Exception e) {
@@ -1801,10 +2073,9 @@ public class ImageTileZoomView extends View {
         return exifOrientation;
     }
 
-    private void execute(AsyncTask<Void, Void, ?> asyncTask) {
-        asyncTask.executeOnExecutor(executor);
+    private void execute(Runnable task) {
+        if (executor != null) executor.execute(task);
     }
-
 
     /**
      * Set scale, center and orientation from saved state.
@@ -1844,7 +2115,10 @@ public class ImageTileZoomView extends View {
      */
     @NonNull
     private Point getMaxBitmapDimensions(Canvas canvas) {
-        return new Point(Math.min(canvas.getMaximumBitmapWidth(), maxTileWidth), Math.min(canvas.getMaximumBitmapHeight(), maxTileHeight));
+        return new Point(Math.min(
+                canvas.getMaximumBitmapWidth(), maxTileWidth),
+                Math.min(canvas.getMaximumBitmapHeight(), maxTileHeight)
+        );
     }
 
     /**
@@ -1883,11 +2157,20 @@ public class ImageTileZoomView extends View {
         if (getRequiredRotation() == 0) {
             target.set(sRect);
         } else if (getRequiredRotation() == 90) {
-            target.set(sRect.top, sHeight - sRect.right, sRect.bottom, sHeight - sRect.left);
+            target.set(
+                    sRect.top, sHeight - sRect.right,
+                    sRect.bottom, sHeight - sRect.left
+            );
         } else if (getRequiredRotation() == 180) {
-            target.set(sWidth - sRect.right, sHeight - sRect.bottom, sWidth - sRect.left, sHeight - sRect.top);
+            target.set(
+                    sWidth - sRect.right, sHeight - sRect.bottom,
+                    sWidth - sRect.left, sHeight - sRect.top
+            );
         } else {
-            target.set(sWidth - sRect.bottom, sRect.left, sWidth - sRect.top, sRect.right);
+            target.set(
+                    sWidth - sRect.bottom, sRect.left,
+                    sWidth - sRect.top, sRect.right
+            );
         }
     }
 
@@ -2154,7 +2437,10 @@ public class ImageTileZoomView extends View {
      * pan limits, keeping the requested center as near to the middle of the screen as allowed.
      */
     @NonNull
-    private PointF limitedSCenter(float sCenterX, float sCenterY, float scale, @NonNull PointF sTarget) {
+    private PointF limitedSCenter(
+            float sCenterX, float sCenterY,
+            float scale, @NonNull PointF sTarget
+    ) {
         PointF vTranslate = vTranslateForSCenter(sCenterX, sCenterY, scale);
         int vxCenter = getPaddingLeft() + (getWidth() - getPaddingRight() - getPaddingLeft()) / 2;
         int vyCenter = getPaddingTop() + (getHeight() - getPaddingBottom() - getPaddingTop()) / 2;
@@ -2170,7 +2456,9 @@ public class ImageTileZoomView extends View {
     private float minScale() {
         int vPadding = getPaddingBottom() + getPaddingTop();
         int hPadding = getPaddingLeft() + getPaddingRight();
-        if (minimumScaleType == SCALE_TYPE_CENTER_CROP || minimumScaleType == SCALE_TYPE_START) {
+        if (minimumScaleType == SCALE_TYPE_CENTER_CROP
+                || minimumScaleType == SCALE_TYPE_START
+        ) {
             return Math.max(
                     (getWidth() - hPadding) / (float) sWidth(),
                     (getHeight() - vPadding) / (float) sHeight()
@@ -2272,7 +2560,9 @@ public class ImageTileZoomView extends View {
      *
      * @param regionDecoderClass The {@link ImageRegionDecoder} implementation to use.
      */
-    public final void setRegionDecoderClass(@NonNull Class<? extends ImageRegionDecoder> regionDecoderClass) {
+    public final void setRegionDecoderClass(
+            @NonNull Class<? extends ImageRegionDecoder> regionDecoderClass
+    ) {
         //noinspection ConstantConditions
         if (regionDecoderClass == null) {
             throw new IllegalArgumentException("Decoder class cannot be set to null");
@@ -2287,7 +2577,9 @@ public class ImageTileZoomView extends View {
      * @param regionDecoderFactory The {@link DecoderFactory} implementation that produces {@link ImageRegionDecoder}
      *                             instances.
      */
-    public final void setRegionDecoderFactory(@NonNull DecoderFactory<? extends ImageRegionDecoder> regionDecoderFactory) {
+    public final void setRegionDecoderFactory(
+            @NonNull DecoderFactory<? extends ImageRegionDecoder> regionDecoderFactory
+    ) {
         //noinspection ConstantConditions
         if (regionDecoderFactory == null) {
             throw new IllegalArgumentException("Decoder factory cannot be set to null");
@@ -2302,7 +2594,9 @@ public class ImageTileZoomView extends View {
      *
      * @param bitmapDecoderClass The {@link ImageDecoder} implementation to use.
      */
-    public final void setBitmapDecoderClass(@NonNull Class<? extends ImageDecoder> bitmapDecoderClass) {
+    public final void setBitmapDecoderClass(
+            @NonNull Class<? extends ImageDecoder> bitmapDecoderClass
+    ) {
         //noinspection ConstantConditions
         if (bitmapDecoderClass == null) {
             throw new IllegalArgumentException("Decoder class cannot be set to null");
@@ -2316,7 +2610,9 @@ public class ImageTileZoomView extends View {
      *
      * @param bitmapDecoderFactory The {@link DecoderFactory} implementation that produces {@link ImageDecoder} instances.
      */
-    public final void setBitmapDecoderFactory(@NonNull DecoderFactory<? extends ImageDecoder> bitmapDecoderFactory) {
+    public final void setBitmapDecoderFactory(
+            @NonNull DecoderFactory<? extends ImageDecoder> bitmapDecoderFactory
+    ) {
         //noinspection ConstantConditions
         if (bitmapDecoderFactory == null) {
             throw new IllegalArgumentException("Decoder factory cannot be set to null");
@@ -2380,7 +2676,9 @@ public class ImageTileZoomView extends View {
      */
     public final void setMinimumScaleType(int scaleType) {
         if (!VALID_SCALE_TYPES.contains(scaleType)) {
-            throw new IllegalArgumentException("Invalid scale type: " + scaleType);
+            throw new IllegalArgumentException(
+                    "Invalid scale type: " + scaleType
+            );
         }
         this.minimumScaleType = scaleType;
         if (isReady()) {
@@ -2731,7 +3029,9 @@ public class ImageTileZoomView extends View {
      */
     public final void setDoubleTapZoomStyle(int doubleTapZoomStyle) {
         if (!VALID_ZOOM_STYLES.contains(doubleTapZoomStyle)) {
-            throw new IllegalArgumentException("Invalid zoom style: " + doubleTapZoomStyle);
+            throw new IllegalArgumentException(
+                    "Invalid zoom style: " + doubleTapZoomStyle
+            );
         }
         this.doubleTapZoomStyle = doubleTapZoomStyle;
     }
@@ -2986,8 +3286,9 @@ public class ImageTileZoomView extends View {
          * nothing else.
          */
         @NonNull
-        private AnimationBuilder withPanLimited(boolean panLimited) {
-            this.panLimited = panLimited;
+        private AnimationBuilder withPanLimited() {
+            // panLimited boolean params Remove
+            this.panLimited = false;
             return this;
         }
 
@@ -3015,7 +3316,13 @@ public class ImageTileZoomView extends View {
             int vxCenter = getPaddingLeft() + (getWidth() - getPaddingRight() - getPaddingLeft()) / 2;
             int vyCenter = getPaddingTop() + (getHeight() - getPaddingBottom() - getPaddingTop()) / 2;
             float targetScale = limitedScale(this.targetScale);
-            PointF targetSCenter = panLimited ? limitedSCenter(this.targetSCenter.x, this.targetSCenter.y, targetScale, new PointF()) : this.targetSCenter;
+
+            PointF targetSCenter = panLimited ? limitedSCenter(
+                    this.targetSCenter.x,
+                    this.targetSCenter.y,
+                    targetScale, new PointF()
+            ) : this.targetSCenter;
+
             anim = new Anim();
             anim.scaleStart = scale;
             anim.scaleEnd = targetScale;
@@ -3032,14 +3339,15 @@ public class ImageTileZoomView extends View {
             anim.interruptible = interruptible;
             anim.easing = easing;
             anim.origin = origin;
-            anim.time = System.currentTimeMillis();
             anim.listener = listener;
 
             if (vFocus != null) {
                 // Calculate where translation will be at the end of the anim
                 float vTranslateXEnd = vFocus.x - (targetScale * anim.sCenterStart.x);
                 float vTranslateYEnd = vFocus.y - (targetScale * anim.sCenterStart.y);
-                ScaleAndTranslate satEnd = new ScaleAndTranslate(targetScale, new PointF(vTranslateXEnd, vTranslateYEnd));
+                ScaleAndTranslate satEnd = new ScaleAndTranslate(
+                        targetScale, new PointF(vTranslateXEnd, vTranslateYEnd)
+                );
                 // Fit the end translation into bounds
                 fitToBounds(true, satEnd);
                 // Adjust the position of the focus point at end so image will be in bounds
@@ -3053,4 +3361,5 @@ public class ImageTileZoomView extends View {
         }
 
     }
+
 }

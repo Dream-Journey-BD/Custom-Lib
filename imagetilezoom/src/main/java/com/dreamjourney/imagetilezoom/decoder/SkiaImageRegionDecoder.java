@@ -11,6 +11,7 @@ import android.graphics.BitmapRegionDecoder;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.net.Uri;
+import android.os.Build;
 import android.text.TextUtils;
 
 import androidx.annotation.Keep;
@@ -94,19 +95,43 @@ public class SkiaImageRegionDecoder implements ImageRegionDecoder {
                 }
             }
 
-            decoder = BitmapRegionDecoder.newInstance(
-                    context.getResources().openRawResource(id), false
-            );
-        } else if (uriString.startsWith(ASSET_PREFIX)) {
-            String assetName = uriString.substring(ASSET_PREFIX.length());
-            decoder = BitmapRegionDecoder.newInstance(context.getAssets().open(
-                    assetName, AssetManager.ACCESS_RANDOM), false
-            );
-        } else if (uriString.startsWith(FILE_PREFIX)) {
-            decoder = BitmapRegionDecoder.newInstance(
-                    uriString.substring(FILE_PREFIX.length()),
+            // Updated for API 31+ (deprecated BitmapRegionDecoder.newInstance fix)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                decoder = BitmapRegionDecoder.newInstance(
+                        context.getResources().openRawResource(id)
+                );
+            } else decoder = BitmapRegionDecoder.newInstance(
+                    context.getResources().openRawResource(id),
                     false
             );
+
+        } else if (uriString.startsWith(ASSET_PREFIX)) {
+
+            String assetName = uriString.substring(ASSET_PREFIX.length());
+
+            // Updated for API 31+ (deprecated BitmapRegionDecoder.newInstance fix)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                decoder = BitmapRegionDecoder.newInstance(
+                        context.getAssets().open(assetName, AssetManager.ACCESS_RANDOM)
+                );
+            } else {
+                decoder = BitmapRegionDecoder.newInstance(context.getAssets().open(
+                        assetName, AssetManager.ACCESS_RANDOM), false
+                );
+            }
+
+        } else if (uriString.startsWith(FILE_PREFIX)) {
+            // Updated for API 31+ (deprecated BitmapRegionDecoder.newInstance fix)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                decoder = BitmapRegionDecoder.newInstance(
+                        uriString.substring(FILE_PREFIX.length())
+                );
+            } else {
+                decoder = BitmapRegionDecoder.newInstance(
+                        uriString.substring(FILE_PREFIX.length()),
+                        false
+                );
+            }
         } else {
             InputStream inputStream = null;
             try {
@@ -118,7 +143,14 @@ public class SkiaImageRegionDecoder implements ImageRegionDecoder {
                                     "Unable to initialise with uri."
                     );
                 }
-                decoder = BitmapRegionDecoder.newInstance(inputStream, false);
+
+                // Updated for API 31+ (deprecated BitmapRegionDecoder.newInstance fix)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    decoder = BitmapRegionDecoder.newInstance(inputStream);
+                } else {
+                    decoder = BitmapRegionDecoder.newInstance(inputStream, false);
+                }
+
             } finally {
                 if (inputStream != null) {
                     try {

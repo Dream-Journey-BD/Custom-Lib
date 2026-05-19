@@ -3,7 +3,8 @@ package com.dreamjourney.imagetilezoom.tsak;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.Uri;
-import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.dreamjourney.imagetilezoom.ImageTileZoomView;
@@ -13,19 +14,22 @@ import com.dreamjourney.imagetilezoom.decoder.ImageDecoder;
 import java.lang.ref.WeakReference;
 
 /**
- * Async task used to load bitmap without blocking the UI thread.
+ * Runnable used to load bitmap without blocking the UI thread.
  */
-public class BitmapLoadTask extends AsyncTask<Void, Void, Integer> {
+public class BitmapLoadTask implements Runnable {
     private final WeakReference<DecoderFactory<? extends ImageDecoder>> decoderFactoryRef;
     private static final String TAG = "BitmapLoadTask_LOG";
     private final WeakReference<ImageTileZoomView> viewRef;
     private final WeakReference<Context> contextRef;
     private final Uri source;
     private final boolean preview;
-    private Bitmap bitmap;
-    private Exception exception;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    public BitmapLoadTask(ImageTileZoomView view, Context context, DecoderFactory<? extends ImageDecoder> decoderFactory, Uri source, boolean preview) {
+    public BitmapLoadTask(
+            ImageTileZoomView view, Context context,
+            DecoderFactory<? extends ImageDecoder> decoderFactory,
+            Uri source, boolean preview
+    ) {
         this.viewRef = new WeakReference<>(view);
         this.contextRef = new WeakReference<>(context);
         this.decoderFactoryRef = new WeakReference<>(decoderFactory);
@@ -34,44 +38,53 @@ public class BitmapLoadTask extends AsyncTask<Void, Void, Integer> {
     }
 
     @Override
-    protected Integer doInBackground(Void... params) {
+    public void run() {
+        // Same Like (doInBackground)
+        Bitmap bitmap = null;
+        Integer orientation = null;
+        Exception exception = null;
+
         try {
-            String sourceUri = source.toString();
             Context context = contextRef.get();
             DecoderFactory<? extends ImageDecoder> decoderFactory = decoderFactoryRef.get();
             ImageTileZoomView view = viewRef.get();
+
             if (context != null && decoderFactory != null && view != null) {
-                view.debug("BitmapLoadTask.doInBackground");
+                view.debug("BitmapLoadTask.run (Background)");
                 bitmap = decoderFactory.make().decode(context, source);
-                return view.getExifOrientation(context, sourceUri);
+                orientation = view.getExifOrientation(context, source.toString());
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to load bitmap", e);
-            this.exception = e;
+            exception = e;
         } catch (OutOfMemoryError e) {
             Log.e(TAG, "Failed to load bitmap - OutOfMemoryError", e);
-            this.exception = new RuntimeException(e);
+            exception = new RuntimeException(e);
         }
-        return null;
-    }
 
-    @Override
-    protected void onPostExecute(Integer orientation) {
-        ImageTileZoomView imageTileZoomView = viewRef.get();
-        if (imageTileZoomView != null) {
-            if (bitmap != null && orientation != null) {
-                if (preview) {
-                    imageTileZoomView.onPreviewLoaded(bitmap);
-                } else {
-                    imageTileZoomView.onImageLoaded(bitmap, orientation, false);
-                }
-            } else if (exception != null && imageTileZoomView.onImageEventListener != null) {
-                if (preview) {
-                    imageTileZoomView.onImageEventListener.onPreviewLoadError(exception);
-                } else {
-                    imageTileZoomView.onImageEventListener.onImageLoadError(exception);
+        // ফলাফল মেইন থ্রেডে (UI Thread) পাঠানোর জন্য Handler ব্যবহার করা হচ্ছে
+        final Bitmap finalBitmap = bitmap;
+        final Integer finalOrientation = orientation;
+        final Exception finalException = exception;
+
+        mainHandler.post(() -> {
+            // এই অংশটি মেইন থ্রেডে চলবে (onPostExecute এর মতো)
+            ImageTileZoomView view = viewRef.get();
+            if (view != null) {
+                if (finalBitmap != null && finalOrientation != null) {
+                    if (preview) {
+                        view.onPreviewLoaded(finalBitmap);
+                    } else {
+                        view.onImageLoaded(finalBitmap, finalOrientation, false);
+                    }
+                } else if (finalException != null && view.onImageEventListener != null) {
+                    if (preview) {
+                        view.onImageEventListener.onPreviewLoadError(finalException);
+                    } else {
+                        view.onImageEventListener.onImageLoadError(finalException);
+                    }
                 }
             }
-        }
+        });
     }
 }
