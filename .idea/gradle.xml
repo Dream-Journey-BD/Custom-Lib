@@ -11,7 +11,9 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/gpuimage" />
             <option value="$PROJECT_DIR$/imagetilezoom" />
+            <option value="$PROJECT_DIR$/utilsx" />
           </set>
         </option>
         <option name="resolveExternalAnnotations" value="false" />

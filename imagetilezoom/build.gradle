@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.library'
+    id 'maven-publish'
 }
 
 android {
@@ -30,6 +31,11 @@ android {
         options.compilerArgs << "-Xlint:deprecation"
     }
 
+    // For Publish to Maven Central
+    publishing {
+        singleVariant("release")
+    }
+
 }
 
 dependencies {
@@ -39,6 +45,21 @@ dependencies {
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
-    implementation 'androidx.exifinterface:exifinterface:1.4.2'
+    // public library
+    implementation libs.exifinterface
 
+}
+
+// Publish to Maven Central
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.findByName("release")
+                groupId = 'com.dreamjourneybd.library'
+                artifactId = 'imagetilezoom'
+                version = '1.0.0'
+            }
+        }
+    }
 }

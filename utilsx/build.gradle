@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.library'
+    id 'maven-publish'
 }
 
 android {
@@ -31,6 +32,11 @@ android {
         options.compilerArgs << "-Xlint:deprecation"
     }
 
+    // For Publish to Maven Central
+    publishing {
+        singleVariant("release")
+    }
+
 }
 
 dependencies {
@@ -40,9 +46,23 @@ dependencies {
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
-    // public Lib
-    implementation 'com.intuit.ssp:ssp-android:1.1.1'
-    implementation 'com.intuit.sdp:sdp-android:1.1.1'
-    implementation "androidx.exifinterface:exifinterface:1.4.1"
+    // public library
+    implementation libs.ssp.android
+    implementation libs.sdp.android
+    implementation libs.exifinterface
 
+}
+
+// Publish to Maven Central
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.findByName("release")
+                groupId = 'com.dreamjourneybd.library'
+                artifactId = 'utilsx'
+                version = '1.0.0'
+            }
+        }
+    }
 }

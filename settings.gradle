@@ -16,16 +16,15 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
+        mavenLocal()
         mavenCentral()
     }
 }
 
-rootProject.name = "Custom Lib"
-include ':app'
-
-//--- Custom library Here ---
+rootProject.name = "Custom Library"
+// Custom library
 include ':utilsx'
-// include ':gpuimage'
+include ':gpuimage'
 include ':imagetilezoom'
-
-// Example: project(':utilsx').projectDir = new File(rootDir, "utilsx")
+// main Project
+include ':app'

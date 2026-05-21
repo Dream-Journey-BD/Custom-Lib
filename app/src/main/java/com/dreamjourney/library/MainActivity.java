@@ -1,4 +1,4 @@
-package com.dreamjourney.customlib;
+package com.dreamjourney.library;
 
 import android.os.Bundle;
 
@@ -9,7 +9,6 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 public class MainActivity extends AppCompatActivity {
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

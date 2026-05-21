@@ -4,12 +4,12 @@ plugins {
 
 android {
 
-    namespace 'com.dreamjourney.customlib'
+    namespace 'com.dreamjourney.library'
     compileSdk 35
 
     defaultConfig {
 
-        applicationId "com.dreamjourney.customlib"
+        applicationId "com.dreamjourney.library"
         minSdk 26
         targetSdk 35
         versionCode 1
@@ -44,7 +44,5 @@ dependencies {
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
-    // Custom Lib Here
-    implementation project(':utilsx')
 
 }
